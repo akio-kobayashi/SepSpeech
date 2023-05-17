@@ -146,3 +146,5 @@ def compute_global_mean_std(csv_path:str, config:dict) -> Tuple[Tensor, Tensor]:
 
     path = config['global_mean_std']
     np.savez(path, mean=mean, std=std)
+
+    return mean, std
