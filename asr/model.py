@@ -5,41 +5,41 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-sys.path.append('../asr/tiny_transformer')
-#from conformer import ConformerConvModule, ConformerBlock
 from torchaudio.models import Conformer
+from torch import Tensor
+from typing import Tuple
 
 class LayerScale(nn.Module):
-    def __init__(self, dim, scale):
+    def __init__(self, dim:int, scale:float) -> None:
         chwise_scaler = nn.Parameter(torch.ones(dim) * scale)
-        torch.register_parameter('chwise_scaler', diag)
+        torch.register_parameter('chwise_scaler', chwise_scaler)
 
-    def forward(self, x):
+    def forward(self, x:Tensor) -> Tensor:
         # x: b c t f
         x = rearrange('b c t f-> b t f c')
-        x = torch.mul(self.diag, x)
+        x = torch.mul(x, self.chwise_scaler)
         x = rearrange('b t f c -> b c t f')
         return x
 
 class DepthwiseConv(nn.Module):
-    def __init__(self, in_channels, kernel_size, padding, bias=True):
+    def __init__(self, in_channels, kernel_size, padding, bias=True)->None:
         super().__init__()
         self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size=kernel_size, 
                                    padding=padding, groups=in_channels, bias=bias)
     
-    def forward(self, x):
+    def forward(self, x:Tensor) -> Tensor:
         return self.depthwise(x)
     
 class PointwiseConv(nn.Module):
-    def __init__(self, in_channels, out_channels, bias=False):
+    def __init__(self, in_channels:int, out_channels:int, bias=False)->None:
         super().__init__()
         self.pointwise = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=bias)
 
-    def forward(self, x):
+    def forward(self, x:Tensor) -> Tensor:
         return self.pointwise(x)
 
 class ConvNeXTBlock(nn.Module):
-    def __init__(self, in_channels, kernel_size, padding=0):
+    def __init__(self, in_channels:int, kernel_size:int, padding=0, scale=0.1) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.DepthwiseiConv(in_channels, kernel_size, padding),
@@ -47,9 +47,10 @@ class ConvNeXTBlock(nn.Module):
             nn.PointwiseConv(in_channels, in_channels*4),
             nn.GELU(),
             nn.PointwiseConv(in_channels*4, in_channels),
-            LayerScale(in_channels)
+            LayerScale(in_channels, scale)
         )
-    def forward(self, x):
+    def forward(self, x:Tensor) -> Tensor:
+        # (b 1 t f)
         return self.block(x)
     
 class CNTF(nn.Module):
@@ -73,29 +74,30 @@ class CNTF(nn.Module):
 
     def forward(self, x:Tensor) -> Tensor:
         # x (b t f -> b 1 t f)
-        x = self.cntf(x.unsqueeze(1))
+        if x.dims() == 3:
+            x = self.cntf(x.unsqueeze(1))
         # x (b c t f) -> (b t (c f))
         x = rearrange('b c t f -> b t (c f)')
         return self.linear(x)
     
-    def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=0):
+    def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=0)->list:
         leng=[]
         for l in input_lengths:
             np.floor((l + 2*padding - dilation * (kernel_size-1) - 1)/stride + 1)
             leng.append(l)
         return leng
 
-    def valid_lengths(self, input_lengths):
-        leng = _valid_lengths(input_lengths, self.kernel_size, stride=2)
-        leng = _valid_lengths(leng, self.kernel_size, stride=1)
-        leng = _valid_lengths(leng, self.kernel_size, stride=2)
-        leng = _valid_lengths(leng, self.kernel_size, stride=1)
-        leng = _valid_lengths(leng, self.kernel_size, stride=2)
-        leng = _valid_lengths(leng, self.kernel_size, stride=1)
+    def valid_lengths(self, input_lengths:list) -> list:
+        leng = self._valid_lengths(input_lengths, self.kernel_size, stride=2)
+        leng = self._valid_lengths(leng, self.kernel_size, stride=1)
+        leng = self._valid_lengths(leng, self.kernel_size, stride=2)
+        leng = self._valid_lengths(leng, self.kernel_size, stride=1)
+        leng = self._valid_lengths(leng, self.kernel_size, stride=2)
+        leng = self._valid_lengths(leng, self.kernel_size, stride=1)
         return leng
 
 class PositionEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=2000):
+    def __init__(self, d_model, dropout=0.1, max_len=2000) -> None:
         super(PositionEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
 
@@ -108,37 +110,37 @@ class PositionEncoding(nn.Module):
         pe = pe.unsqueeze(0) # (b, t, f)
         self.register_buffer('pe', pe)
 
-    def forward(self, x):
+    def forward(self, x:Tensor) -> Tensor:
         x = x + self.pe[:, :x.shape[1], :]
         return self.dropout(x)
 
 class CTCLoss(nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super(CTCLoss, self).__init__()
         self.ctc=nn.CTCLoss()
 
-    def forward(self, outputs, labels, output_lengths, label_lengths):
+    def forward(self, outputs:Tensor, labels:Tensor, output_lengths:list, label_lengths:list) -> Tensor:
         outputs = rearrange(outputs, 'b t c -> t b c')
 
         return  self.ctc(outputs, labels,
                         output_lengths, label_lengths)
 
 class CELoss(nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super(CELoss, self).__init__()
         self.ce=nn.CrossEntropyLoss()
 
-    def forward(self, y_prd, y_ref, y_prd_len, y_ref_len):
+    def forward(self, y_prd:Tensor, y_ref:Tensor, leng:list) -> Tensor:
         loss = 0.
         for b in range(y_prd.shape[0]):
-            prd=y_prd[b, :y_prd_len[b], :]
-            ref=y_ref[b, :y_ref_len[b]]
+            prd=y_prd[b, :leng[b], :]
+            ref=y_ref[b, :leng[b]]
             loss += self.ce(prd,ref)
 
         return torch.mean(loss)
 
 class ASRModel(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config:dict) -> None:
         super(ASRModel, self).__init__()
         self.dim_input=config['dim_input']
         self.dim_output=config['dim_output']
@@ -150,12 +152,13 @@ class ASRModel(nn.Module):
         #self.enc_pe = PositionEncoding(self.dim_model, max_len=2000)
         self.dec_pe = PositionEncoding(self.dim_model, max_len=256)
         self.dec_embed = nn.Embedding(self.dim_output, self.dim_model)
-        self.use_memory_mask = bool(config['memory_mask'])
 
         self.specdim=config['specdim']
         self.cntf_channels=config['cntf_channels']
         self.kernel_size=config['kernel_size']
         self.cntf = CNTF(dim=self.spcedim, cntf_channels=config['cntf_channels'], output_dim=self.dim_input, kernel_size=self.kernel_size)
+
+        self.eos = config['eos']
 
         if config['model_type'] == 'conformer':
             self.encoder = Conformer(input_dim=self.dim_model, 
@@ -187,16 +190,15 @@ class ASRModel(nn.Module):
 
         self.ce_loss = CELoss()
 
-    def forward(self, inputs, labels, input_lengths, label_lengths):
+    def forward(self, inputs:Tensor, labels:Tensor, input_lengths:list, label_lengths:list) -> Tensor:
 
         labels_in = labels[:, 0:labels.shape[-1]-1] # remove eos 
         labels_out = labels[:, 1:] # remove bos
 
         label_lengths -= 1 # remove tag
 
-        #y=self.enc_pe(self.input_encoder(inputs))
         y = self.cntf(inputs)
-        valid_input_lengths = self.cntf.valid_lenths(input_lengths)
+        valid_input_lengths = self.cntf.valid_lengths(input_lengths)
 
         z=self.dec_pe(self.dec_embed(labels_in))
         source_mask, target_mask, source_padding_mask, target_padding_mask = self.generate_masks(y, z, valid_input_lengths, label_lengths)
@@ -208,9 +210,9 @@ class ASRModel(nn.Module):
                          memory_key_padding_mask=source_padding_mask)
         
     
-        return y, valid_input_lengths
+        return y
 
-    def generate_masks(self, src, tgt, src_len, tgt_len):
+    def generate_masks(self, src:Tensor, tgt:Tensor, src_len:list, tgt_len:list) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         B=src.shape[0]
         S=src.shape[1]
         src_mask=torch.zeros((S,S), dtype=bool)
@@ -225,41 +227,15 @@ class ASRModel(nn.Module):
 
         return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-    def generate_square_subsequent_mask(self, seq_len):
+    def generate_square_subsequent_mask(self, seq_len:int) -> Tensor:
         mask = (torch.triu(torch.ones((seq_len, seq_len))) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def update_memory_mask(self, src, src_len, ys, memory_mask):
-        # make memory mask for monotonic decoding
-        weights=self.decoder._get_attention_weights() # [(1, T, S),...]
-        sum=weights[0]
-        for n in range(1, len(weights)):
-            sum+=weights[n]
-        max_pos = torch.argmax(torch.from_numpy(sum), dim=2).to('cpu').detach().numpy().copy() # (1, T)
-        start = max_pos[0, -1]-5
-        if start < 0:
-            start = 0
-        end = max_pos[0, -1]+10
-        if end > src_len:
-            end = src_len
-        if memory_mask is None:
-            memory_mask=torch.zeros(self.num_heads, ys.shape[1], src.shape[1])
-            memory_mask[:, 0, :]=1.
-            memory_mask[:, 1, start:end]=1.
-            memory_mask=memory_mask.float().masked_fill(memory_mask == 0, float('-inf')).masked_fill(memory_mask == 1, float(0.0))
-        else:
-            temp = torch.zeros(self.num_heads, 1, src.shape[1])
-            temp[:, -1, start:end] = 1.
-            temp=temp.float().masked_fill(temp == 0, float('-inf')).masked_fill(temp == 1, float(0.0))
-            memory_mask = torch.cat((memory_mask, temp), dim=1)
-
-        return memory_mask
-
-    def greedy_decode(self, src, src_len, max_len):
+    def greedy_decode(self, src:Tensor, src_len:int) -> list:
         with torch.no_grad():
-            src_padding_mask = torch.ones(1, src.shape[1], dtype=bool)
-            src_padding_mask[:, :src_len]=False
+            #src_padding_mask = torch.ones(1, src.shape[1], dtype=bool)
+            #src_padding_mask[:, :src_len]=False
             #y = self.enc_pe(self.prenet(src))
             y = self.cntf(src)
             #memory = self.transformer.encoder(y, src_key_padding_mask=src_padding_mask)
@@ -267,7 +243,7 @@ class ASRModel(nn.Module):
             ys=torch.ones((1, 1), dtype=torch.int)
             ys*=2
             memory_mask=None
-        for i in range(max_len - 1):
+        for i in range(self.decode_max_len - 1):
             with torch.no_grad():
                 mask=self.generate_square_subsequent_mask(ys.shape[1])
                 z = self.dec_pe(self.dec_embed(ys))
@@ -277,10 +253,7 @@ class ASRModel(nn.Module):
 
                 ys = torch.cat((ys, z), dim=1) #(1, T+1)
 
-                if self.use_memory_mask:
-                    memory_mask = self.update_memory_mask(src, src_len, ys, memory_mask)
-
-                if z == 3:
+                if z == self.eos:
                     break
 
             torch.cuda.empty_cache()
