@@ -19,7 +19,7 @@ class LitASR(pl.LightningModule):
         return self.model(inputs, labels, input_lengths, label_lengths)
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
-        inputs, labels, input_lengths, label_lengths = batch
+        inputs, labels, input_lengths, label_lengths, _ = batch
 
         _pred = self.forward(inputs, labels, input_lengths, label_lengths)
         labels_out = labels[:, 1:]
@@ -31,7 +31,7 @@ class LitASR(pl.LightningModule):
         return _loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0) -> Tensor:
-        inputs, labels, input_lengths, label_lengths = batch
+        inputs, labels, input_lengths, label_lengths, _ = batch
 
         _pred = self.forward(inputs, labels, input_lengths, label_lengths)
         labels_out = labels[:, 1:]

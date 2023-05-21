@@ -9,6 +9,7 @@ from typing import Tuple
 from torch import Tensor
 import torchaudio
 from typing import Tuple
+from asr_tokenizer import ASRTokenizer
 
 '''
     音声認識用データの抽出
@@ -18,7 +19,7 @@ from typing import Tuple
 '''
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, config:dict, segment=10) -> None:
+    def __init__(self, csv_path:str, config:dict, segment=10, tokenizer=None) -> None:
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(csv_path)
@@ -58,11 +59,14 @@ class SpeechDataset(torch.utils.data.Dataset):
             self.freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=config['freq_mask'])
             self.time_masking = torchaudio.transforms.TimeMasking(freq_mask_param=config['time_mask'])
  
+        self.tokenizer = tokenizer
+        if self.tokenizer == None:
+            self.tokenizer = ASRTokenizer(config['tokenizer'], config['max_length'])
 
     def __len__(self) -> int:
         return len(self.df)
 
-    def __getitem__(self, idx:int) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    def __getitem__(self, idx:int) -> Tuple[Tensor, Tensor, str]:
         row = self.df.iloc[idx]
         
         source_path = row['source']
@@ -81,11 +85,11 @@ class SpeechDataset(torch.utils.data.Dataset):
         label_path = row['label']
         with open(label_path, 'r') as  f:
             line = f.readline()
-            label = [ int(x) for x in line.strip().split() ]
+            label = self.tokenizer.text2token(line.stirp())
             label = torch.tensor(label, dtype=int)
         return source, label, row['key']
 
-def data_processing(data:Tuple[Tensor, list, str]) -> Tuple[Tensor, Tensor, list, list]:
+def data_processing(data:Tuple[Tensor, list, str]) -> Tuple[Tensor, Tensor, list, list, list]:
     inputs = []
     labels = []
     input_lengths = []
