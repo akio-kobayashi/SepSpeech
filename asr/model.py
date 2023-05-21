@@ -192,12 +192,17 @@ class ASRModel(nn.Module):
 
     def forward(self, inputs:Tensor, labels:Tensor, input_lengths:list, label_lengths:list) -> Tensor:
 
+        # yield inout/output sequences from labels
+        # <s> x y w ... u
+        #  |  | | | ... |
+        #  x  y w z ...</s>
         labels_in = labels[:, 0:labels.shape[-1]-1] # remove eos 
         labels_out = labels[:, 1:] # remove bos
-
         label_lengths -= 1 # remove tag
 
         y = self.cntf(inputs)
+
+        # compute valid input lengths because CNTF reduce the original lengths according to downsampling
         valid_input_lengths = self.cntf.valid_lengths(input_lengths)
 
         z=self.dec_pe(self.dec_embed(labels_in))
@@ -208,8 +213,7 @@ class ASRModel(nn.Module):
                          memory_mask=None,
                          tgt_key_padding_mask=target_padding_mask,
                          memory_key_padding_mask=source_padding_mask)
-        
-    
+            
         return y
 
     def generate_masks(self, src:Tensor, tgt:Tensor, src_len:list, tgt_len:list) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
@@ -249,6 +253,7 @@ class ASRModel(nn.Module):
                 z = self.dec_pe(self.dec_embed(ys))
                 z = self.decoder(z, memory, tgt_mask=mask, memory_mask=memory_mask)
                 z = F.log_softmax(self.fc(z), dim=-1)
+                # get maximum index from last item in tensor
                 z = torch.argmax(z[:, -1, :]).reshape(1, 1)
 
                 ys = torch.cat((ys, z), dim=1) #(1, T+1)

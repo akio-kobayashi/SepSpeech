@@ -22,13 +22,15 @@ def main(config:dict, checkpoint_path=None):
         model = LitASR(config)
 
     train_dataset = SpeechDataset(**config['dataset']['train'], 
-                                  **config['dataset']['segment'])
+                                  config, 
+                                  **config['dataset']['segment']) 
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
                                    shuffle=True, 
                                    collate_fn=lambda x: speech_dataset.data_processing(x))
     valid_dataset = SpeechDataset(**config['dataset']['valid'],
+                                  config,
                                   **config['dataset']['segment'])
     valid_loader = data.DataLoader(dataset=valid_dataset,
                                    **config['dataset']['process'],
