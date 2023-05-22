@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Tuple
-from model import CELoss
+from model import ASRModel, CELoss
 
 class LitASR(pl.LightningModule):
     def __init__(self, config:dict) -> None:

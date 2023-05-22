@@ -1,9 +1,9 @@
 import transformers
 import tokenizers
 from tokenizers import SentencePieceBPETokenizer
-from Typing import Tuple, List
+from typing import Tuple, List
 
-class ASRTokernizer():
+class ASRTokenizer():
     def __init__(self, path, max_length=256, ctc_decode=False):
         super().__init__()
         special_tokens = ["<blk>","<s>", "</s>", "<pad>", "<unk>", "<cls>", "<sep>", "<mask>"]

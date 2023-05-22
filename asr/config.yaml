@@ -7,11 +7,12 @@ dataset:
     segment: 10
     sample_rate: 16000
   train:
-    csv_path: 'train.csv'
+    csv_path: '/export/20230515/train_kanji.csv'
   valid:  
-    csv_path: 'valid.csv'
+    csv_path: '/export/20230515/valid_kanji.csv'
   test:
-    csv_path: 'test.csv'
+    csv_path: '/export/20230515/test_kanji.csv'
+  tokenizer: '/export/20230515/kanji_tokenizer/vocab.csv'
 # trainer parameters
 trainer:
   accelerator: 'auto'

@@ -10,5 +10,5 @@ RUN apt-get update
 RUN apt-get install -y --no-install-recommends emacs python3.9 python3-pip libsndfile1-dev
 # unfortunatelly, we do not use CUDA 12.0
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-RUN pip3 install torchmetrics lightning einops numpy sklearn tqdm pandas scipy numba h5py seaborn wave librosa
+RUN pip3 install torchmetrics lightning einops numpy sklearn tqdm pandas scipy numba h5py seaborn wave librosa transformers python-box
 RUN pip3 install tensorboard

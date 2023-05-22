@@ -21,17 +21,19 @@ def main(config:dict, checkpoint_path=None):
     else:
         model = LitASR(config)
 
-    train_dataset = SpeechDataset(**config['dataset']['train'], 
+    train_dataset = SpeechDataset(config['dataset']['train']['csv_path'], 
                                   config, 
-                                  **config['dataset']['segment']) 
+                                  config['dataset']['segment'],
+                                  tokenizer=None) 
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
                                    shuffle=True, 
                                    collate_fn=lambda x: speech_dataset.data_processing(x))
-    valid_dataset = SpeechDataset(**config['dataset']['valid'],
+    valid_dataset = SpeechDataset(config['dataset']['valid']['csv_path'],
                                   config,
-                                  **config['dataset']['segment'])
+                                  config['dataset']['segment'],
+                                  tokenizer=None)
     valid_loader = data.DataLoader(dataset=valid_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
