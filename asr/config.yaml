@@ -1,0 +1,88 @@
+# dataset
+dataset:
+  process:
+    batch_size: 8
+    num_workers: 2
+  segment:
+    segment: 10
+    sample_rate: 16000
+  train:
+    csv_path: 'train.csv'
+  valid:  
+    csv_path: 'valid.csv'
+  test:
+    csv_path: 'test.csv'
+# trainer parameters
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 400
+  precision: '16-mixed'
+  profiler: 'simple'
+  gradient_clip_val: 5.
+optimizer:
+  lr: 1.e-4
+logger:
+  save_dir: './'
+  version: 1
+  name: 'lightning_logs'
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_top_k: 3
+  mode: 'min'
+  every_n_epochs: 1
+tasnet:
+  kernel_size: 20
+  in_channels: 256
+  enc_channels: 256
+  conv_channels: 512
+  num_blocks: 6
+  block_kernel_size: 3
+  num_repeats: 4
+  num_speakers: 307
+  resample: 1
+unet:
+  attention: True
+  normalize: False #True
+  floor: 0.001
+  resample: 2
+  depth: 5
+  in_channels: 1
+  mid_channels: 256 #512 #48
+  out_channels: 1
+  max_channels: 10000
+  kernel_size: 8
+  growth: 1 #2
+  rescale: 0.1
+  stride: 4
+  reference: 0.1
+  causal: True
+  num_speakers: 307
+diffusion:
+  timesteps: 200
+  beta_start: 0.001
+  beta_end: 0.02
+# sepformer parameters
+sepformer:
+  # positional encoding
+  max_len: 80000
+  #max_len: 10
+  # encoder/decoder conv filters
+  channels: 256 #512 #128
+  kernel_size: 16
+  stride: 8
+  # chunking samples
+  chunk_size: 250
+  # intra- & inter- Transformers
+  d_model: 256 #128
+  nhead: 8
+  dim_feedforward: 1024
+  layer_norm_eps: 1.e-8
+  num_layers: 8 #4
+  # sepformers
+  num_sepformer_layers: 2 #1
+  # speakers
+  num_speakers: 307
+  # dropout (all modules)
+  dropout: 0.1
