@@ -11,8 +11,9 @@ from typing import Tuple
 
 class LayerScale(nn.Module):
     def __init__(self, dim:int, scale:float) -> None:
-        chwise_scaler = nn.Parameter(torch.ones(dim) * scale)
-        torch.register_parameter('chwise_scaler', chwise_scaler)
+        super().__init__()
+        self.chwise_scaler = nn.Parameter(torch.ones(dim) * scale)
+        #torch.register_parameter('chwise_scaler', chwise_scaler)
 
     def forward(self, x:Tensor) -> Tensor:
         # x: b c t f
@@ -42,11 +43,11 @@ class ConvNeXTBlock(nn.Module):
     def __init__(self, in_channels:int, kernel_size:int, padding=0, scale=0.1) -> None:
         super().__init__()
         self.block = nn.Sequential(
-            nn.DepthwiseiConv(in_channels, kernel_size, padding),
+            DepthwiseConv(in_channels, kernel_size, padding),
             nn.LayerNorm(in_channels),
-            nn.PointwiseConv(in_channels, in_channels*4),
+            PointwiseConv(in_channels, in_channels*4),
             nn.GELU(),
-            nn.PointwiseConv(in_channels*4, in_channels),
+            PointwiseConv(in_channels*4, in_channels),
             LayerScale(in_channels, scale)
         )
     def forward(self, x:Tensor) -> Tensor:
@@ -65,10 +66,10 @@ class LayerNorm(nn.Module):
         return x
     
 class CNTF(nn.Module):
-    def __init__(self, dim=80, cntf_channels=104, output_dim=1024, kernel_size=3) -> None:
+    def __init__(self, dim=80, depth=2, cntf_channels=104, output_dim=1024, kernel_size=3) -> None:
         super().__init__()
         self.kernel_size=kernel_size
-        for index in range(self.depth):
+        for index in range(depth):
             self.cntf = nn.Sequential(
                 nn.Conv2d(1, cntf_channels, kernel_size, stride=2),
                 LayerNorm(cntf_channels),
@@ -79,14 +80,17 @@ class CNTF(nn.Module):
                 LayerNorm(2*cntf_channels),
                 nn.Conv2d(2*cntf_channels, 3*cntf_channels, kernel_size=(3,1), stride=(2,1)),
                 ConvNeXTBlock(3*cntf_channels),
-                LayerNorm(3*cntf_channels),
+                nn.LayerNorm(3*cntf_channels),
             )
             self.linear = nn.Linear(3*cntf_channels*dim, output_dim)
 
     def forward(self, x:Tensor) -> Tensor:
         # x (b t f -> b 1 t f)
-        if x.dims() == 3:
-            x = self.cntf(x.unsqueeze(1))
+        print(x.shape)
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+        print(x.shape)
+        x = self.cntf(x)
         # x (b c t f) -> (b t (c f))
         x = rearrange('b c t f -> b t (c f)')
         return self.linear(x)
@@ -114,7 +118,7 @@ class PositionEncoding(nn.Module):
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0)/d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0)/d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
 
@@ -152,23 +156,22 @@ class CELoss(nn.Module):
 
 class ASRModel(nn.Module):
     def __init__(self, config:dict) -> None:
-        super(ASRModel, self).__init__()
-        self.dim_input=config['dim_input']
-        self.dim_output=config['dim_output']
-        self.dim_model=config['dim_model']
-        self.dim_feedforward=config['dim_feedforward']
-        self.num_heads=config['num_heads']
-        self.num_encoder_layers=config['num_encoder_layers']
-        self.num_decoder_layers=config['num_decoder_layers']
+        super().__init__()
+        self.dim_input=config['model']['dim_input']
+        self.dim_output=config['model']['dim_output']
+        self.dim_model=config['model']['dim_model']
+        self.dim_feedforward=config['model']['dim_feedforward']
+        self.num_heads=config['model']['num_heads']
+        self.num_encoder_layers=config['model']['num_encoder_layers']
+        self.num_decoder_layers=config['model']['num_decoder_layers']
         #self.enc_pe = PositionEncoding(self.dim_model, max_len=2000)
         self.dec_pe = PositionEncoding(self.dim_model, max_len=256)
         self.dec_embed = nn.Embedding(self.dim_output, self.dim_model)
 
-        self.specdim=config['specdim']
-        self.cntf_channels=config['cntf_channels']
-        self.kernel_size=config['kernel_size']
-        self.cntf = CNTF(dim=self.spcedim, cntf_channels=config['cntf_channels'], output_dim=self.dim_input, kernel_size=self.kernel_size)
-
+        self.cntf_channels=config['model']['cntf_channels']
+        self.kernel_size=config['model']['kernel_size']
+        self.cntf = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_input, kernel_size=self.kernel_size)
+        
         self.eos = config['eos']
 
         if config['model_type'] == 'conformer':
@@ -190,11 +193,11 @@ class ASRModel(nn.Module):
                                                  self.num_encoder_layers,
                                                  nn.LayerNorm(self.dim_model))
             
-        decoder_layer = nn.TransoformerDecoderLayer(self.dim_model,
-                                                    self.num_heads,
-                                                    self.dim_feedforward,
-                                                    batch_first=True,
-                                                    norm_first=True)
+        decoder_layer = nn.TransformerDecoderLayer(self.dim_model,
+                                                   self.num_heads,
+                                                   self.dim_feedforward,
+                                                   batch_first=True,
+                                                   norm_first=True)
         self.decoder = nn.TransformerDecoder(decoder_layer,
                                              self.num_decoder_layers,
                                              nn.LayerNorm(self.dim_model))
@@ -209,8 +212,9 @@ class ASRModel(nn.Module):
         #  x  y w z ...</s>
         labels_in = labels[:, 0:labels.shape[-1]-1] # remove eos 
         labels_out = labels[:, 1:] # remove bos
-        label_lengths -= 1 # remove tag
-
+        #label_lengths -= 1 # remove tag
+        label_lengths = [l -1 for l in label_lengths]
+        
         y = self.cntf(inputs)
 
         # compute valid input lengths because CNTF reduce the original lengths according to downsampling
