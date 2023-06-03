@@ -52,6 +52,17 @@ class ConvNeXTBlock(nn.Module):
     def forward(self, x:Tensor) -> Tensor:
         # (b 1 t f)
         return self.block(x)
+
+class LayerNorm(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.layer_norm = nn.LayerNorm(dim) 
+
+    def forward(self, x):
+        x = rearrange('b c t f -> b t f c')
+        x = self.layer_norm(x)
+        x = rearrange('b t f c -> b c t f')
+        return x
     
 class CNTF(nn.Module):
     def __init__(self, dim=80, cntf_channels=104, output_dim=1024, kernel_size=3) -> None:
@@ -60,15 +71,15 @@ class CNTF(nn.Module):
         for index in range(self.depth):
             self.cntf = nn.Sequential(
                 nn.Conv2d(1, cntf_channels, kernel_size, stride=2),
-                nn.LayerNorm(cntf_channels),
+                LayerNorm(cntf_channels),
                 ConvNeXTBlock(cntf_channels, kernel_size),
-                nn.LayerNorm(cntf_channels),
+                LayerNorm(cntf_channels),
                 nn.Conv2d(cntf_channels, 2*cntf_channels, kernel_size, stride=2),
                 ConvNeXTBlock(2*cntf_channels, kernel_size),
-                nn.LayerNorm(2*cntf_channels),
+                LayerNorm(2*cntf_channels),
                 nn.Conv2d(2*cntf_channels, 3*cntf_channels, kernel_size=(3,1), stride=(2,1)),
                 ConvNeXTBlock(3*cntf_channels),
-                nn.LayerNorm(3*cntf_channels),
+                LayerNorm(3*cntf_channels),
             )
             self.linear = nn.Linear(3*cntf_channels*dim, output_dim)
 
