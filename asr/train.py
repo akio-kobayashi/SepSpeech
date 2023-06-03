@@ -20,10 +20,10 @@ def main(config:dict, checkpoint_path=None):
         model = LitASR.load_from_checkpoint(checkpoint_path, config=config)
     else:
         model = LitASR(config)
-
+        
     train_dataset = SpeechDataset(config['dataset']['train']['csv_path'], 
                                   config, 
-                                  config['dataset']['segment'],
+                                  config['dataset']['segment']['segment'],
                                   tokenizer=None) 
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
@@ -32,7 +32,7 @@ def main(config:dict, checkpoint_path=None):
                                    collate_fn=lambda x: speech_dataset.data_processing(x))
     valid_dataset = SpeechDataset(config['dataset']['valid']['csv_path'],
                                   config,
-                                  config['dataset']['segment'],
+                                  config['dataset']['segment']['segment'],
                                   tokenizer=None)
     valid_loader = data.DataLoader(dataset=valid_dataset,
                                    **config['dataset']['process'],

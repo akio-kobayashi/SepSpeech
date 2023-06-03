@@ -19,12 +19,12 @@ from asr_tokenizer import ASRTokenizer
 '''
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, config:dict, segment=10, tokenizer=None) -> None:
+    def __init__(self, csv_path:str, config:dict, segment=10, sample_rate=16000, tokenizer=None) -> None:
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(csv_path)
         self.segment = segment if segment > 0 else None
-        self.sample_rate = sample_rate
+        self.sample_rate = config['analysis']['sample_rate']
         if self.segment is not None:
             max_len = len(self.df)
             self.max_segment_length = int(self.segment * self.sample_rate)
@@ -37,31 +37,30 @@ class SpeechDataset(torch.utils.data.Dataset):
             self.max_segment_length = None
 
         self.wav2spec = torchaudio.transforms.Spectrogram(
-            sample_rate=config['sample_rate'],
-            nfft=config['nfft'],
-            win_length=config['win_length'],
-            hop_length=config['hop_length'],
+            n_fft=config['analysis']['nfft'],
+            win_length=config['analysis']['win_length'],
+            hop_length=config['analysis']['hop_length'],
             window_fn=torch.hamming_window
         )
         self.spec2mel = torchaudio.transforms.MelScale(
-            n_mels=config['n_mels'],
-            sample_rate=config['sample_rate'],
-            n_stft=config['nfft']//2+1
+            n_mels=config['analysis']['n_mels'],
+            sample_rate=self.sample_rate,
+            n_stft=config['analysis']['nfft']//2+1
         )
 
-        npz=np.load(config['global_mean_std'])
-        mean, std = npz['mean'], npz['std']
+        npz=np.load(config['analysis']['global_mean_std'])
+        self.mean, self.std = npz['mean'], npz['std']
         
         self.eps = 1.e-8
-        self.specaug = True if config['specaug'] else False
+        self.specaug = True if config['augment']['specaug'] else False
         if self.specaug:
-            self.time_stretch = torchaudio.transforms.TimeStretch(n_freq=config['nfft']+1)
-            self.freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=config['freq_mask'])
-            self.time_masking = torchaudio.transforms.TimeMasking(freq_mask_param=config['time_mask'])
+            self.time_stretch = torchaudio.transforms.TimeStretch(n_freq=config['analysis']['nfft']+1)
+            self.freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=config['augment']['freq_mask'])
+            self.time_masking = torchaudio.transforms.TimeMasking(time_mask_param=config['augment']['time_mask'])
  
         self.tokenizer = tokenizer
         if self.tokenizer == None:
-            self.tokenizer = ASRTokenizer(config['tokenizer'], config['max_length'])
+            self.tokenizer = ASRTokenizer(config['dataset']['tokenizer'], config['dataset']['max_length'])
 
     def __len__(self) -> int:
         return len(self.df)
@@ -81,13 +80,15 @@ class SpeechDataset(torch.utils.data.Dataset):
         melspec = torch.log(self.spec2mel(spec)+self.eps) # (1, n_mels, time)
         melspec = torch.t(melspec.squeeze()) # (time, n_mels)
         melspac = (melspec - self.mean)/self.std
-
+        
+        pattern = re.compile('\s\s+')
         label_path = row['label']
         with open(label_path, 'r') as  f:
             line = f.readline()
-            label = self.tokenizer.text2token(line.stirp())
+            line = re.sub(pattern, ' ', line.strip())
+            label = self.tokenizer.text2token(line)
             label = torch.tensor(label, dtype=int)
-        return source, label, row['key']
+        return melspec, label, row['key']
 
 def data_processing(data:Tuple[Tensor, list, str]) -> Tuple[Tensor, Tensor, list, list, list]:
     inputs = []
@@ -112,10 +113,9 @@ def data_processing(data:Tuple[Tensor, list, str]) -> Tuple[Tensor, Tensor, list
         
     return inputs, labels, input_lengths, label_lengths, keys
 
-def compute_global_mean_std(csv_path:str, config:dict) -> Tuple[Tensor, Tensor]:
+def compute_global_mean_std(csv_path:str, **config) -> Tuple[Tensor, Tensor]:
     wav2spec = torchaudio.transforms.Spectrogram(
-        sample_rate=config['sample_rate'],
-        nfft=config['nfft'],
+        n_fft=config['nfft'],
         win_length=config['win_length'],
         hop_length=config['hop_length'],
         window_fn=torch.hamming_window
@@ -127,7 +127,8 @@ def compute_global_mean_std(csv_path:str, config:dict) -> Tuple[Tensor, Tensor]:
     )
     eps = 1.e-8
 
-    sum, sq_sum = 0., 0.
+    num_frames = 0
+    sum, sq_sum = torch.zeros((1, config['n_mels'])), torch.zeros((1, config['n_mels']))
     df = pd.read_csv(csv_path)
     for index, row in df.iterrows():
         source_path, label_path, key = row['source'], row['label'], row['key']
@@ -136,13 +137,14 @@ def compute_global_mean_std(csv_path:str, config:dict) -> Tuple[Tensor, Tensor]:
         melspec = torch.log(spec2mel(spec)+eps) # (1, n_mels, time)
         melspec = torch.t(melspec.squeeze()) # (time, n_mels)
 
-        sum += melspec
-        sq_sum += melspec*melspec
-    mean = sum/len(df)
-    sq_mean = sq_sum/len(df)
+        sum += torch.sum(melspec, 0)
+        sq_sum += torch.sum(melspec*melspec, 0)
+        num_frames += melspec.shape[0]
+        
+    mean = sum/num_frames
+    sq_mean = sq_sum/num_frames
     std = sq_mean - mean*mean
 
-    assert std > 0
     std = torch.sqrt(std)
 
     mean = mean.to('cpu').detach().numpy().copy()

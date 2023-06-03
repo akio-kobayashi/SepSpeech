@@ -1,3 +1,5 @@
+model_type: conformer
+eos: </s>
 # dataset
 dataset:
   process:
@@ -7,12 +9,24 @@ dataset:
     segment: 10
     sample_rate: 16000
   train:
-    csv_path: '/export/20230515/train_kanji.csv'
+    csv_path: '/export/20230515/train_braille.csv'
   valid:  
-    csv_path: '/export/20230515/valid_kanji.csv'
+    csv_path: '/export/20230515/valid_braille.csv'
   test:
-    csv_path: '/export/20230515/test_kanji.csv'
-  tokenizer: '/export/20230515/kanji_tokenizer/vocab.csv'
+    csv_path: '/export/20230515/test_braille.csv'
+  tokenizer: '/export/20230515/braille_tokenizer/vocab.json'
+  max_length: 1000
+analysis:
+  sample_rate: 16000
+  nfft: 400
+  win_length: 400
+  hop_length: 160
+  n_mels: 80
+  global_mean_std: '/export/20230515/global_mean_std.npz'
+augment:
+  specaug: false
+  time_mask: 80
+  freq_mask: 80
 # trainer parameters
 trainer:
   accelerator: 'auto'
@@ -33,57 +47,13 @@ checkpoint:
   save_top_k: 3
   mode: 'min'
   every_n_epochs: 1
-tasnet:
-  kernel_size: 20
-  in_channels: 256
-  enc_channels: 256
-  conv_channels: 512
-  num_blocks: 6
-  block_kernel_size: 3
-  num_repeats: 4
-  num_speakers: 307
-  resample: 1
-unet:
-  attention: True
-  normalize: False #True
-  floor: 0.001
-  resample: 2
-  depth: 5
-  in_channels: 1
-  mid_channels: 256 #512 #48
-  out_channels: 1
-  max_channels: 10000
-  kernel_size: 8
-  growth: 1 #2
-  rescale: 0.1
-  stride: 4
-  reference: 0.1
-  causal: True
-  num_speakers: 307
-diffusion:
-  timesteps: 200
-  beta_start: 0.001
-  beta_end: 0.02
-# sepformer parameters
-sepformer:
-  # positional encoding
-  max_len: 80000
-  #max_len: 10
-  # encoder/decoder conv filters
-  channels: 256 #512 #128
-  kernel_size: 16
-  stride: 8
-  # chunking samples
-  chunk_size: 250
-  # intra- & inter- Transformers
-  d_model: 256 #128
-  nhead: 8
-  dim_feedforward: 1024
-  layer_norm_eps: 1.e-8
-  num_layers: 8 #4
-  # sepformers
-  num_sepformer_layers: 2 #1
-  # speakers
-  num_speakers: 307
-  # dropout (all modules)
-  dropout: 0.1
+model:
+  dim_input: 80
+  dim_model: 256 # conformer(L)
+  dim_output: 71
+  num_heads: 8
+  dim_feedforward: 256
+  num_encoder_layers: 16
+  num_decoder_layers: 8
+  kernel_size: 31
+  cntf_channels: 104

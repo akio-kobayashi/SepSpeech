@@ -10,7 +10,7 @@ class LitASR(pl.LightningModule):
         super().__init__()
         self.config = config
 
-        model = ASRModel(config)
+        self.model = ASRModel(config)
         self.ce_loss = CELoss()
 
         self.save_hyperparameters()
