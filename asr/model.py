@@ -60,9 +60,9 @@ class LayerNorm(nn.Module):
         self.layer_norm = nn.LayerNorm(dim) 
 
     def forward(self, x):
-        x = rearrange('b c t f -> b t f c')
+        x = rearrange(x, 'b c t f -> b t f c')
         x = self.layer_norm(x)
-        x = rearrange('b t f c -> b c t f')
+        x = rearrange(x, 'b t f c -> b c t f')
         return x
     
 class CNTF(nn.Module):
