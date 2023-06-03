@@ -82,7 +82,7 @@ class CNTF(nn.Module):
                 ConvNeXTBlock(3*cntf_channels, kernel_size),
                 LayerNorm(3*cntf_channels),
             )
-            self.linear = nn.Linear(3*cntf_channels*dim, output_dim)
+            self.linear = nn.Linear(3*cntf_channels, output_dim)
 
     def forward(self, x:Tensor) -> Tensor:
         # x (b t f -> b 1 t f)
@@ -93,7 +93,7 @@ class CNTF(nn.Module):
         x = self.cntf(x)
         # x (b c t f) -> (b t (c f))
         x = rearrange(x, 'b c t f -> b t (c f)')
-        print(x.shape)
+        print(x.shape) # (3x104x80)
         return self.linear(x)
     
     def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=0)->list:
