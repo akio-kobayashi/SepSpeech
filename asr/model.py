@@ -92,7 +92,7 @@ class CNTF(nn.Module):
         print(x.shape)
         x = self.cntf(x)
         # x (b c t f) -> (b t (c f))
-        x = rearrange('b c t f -> b t (c f)')
+        x = rearrange(x, 'b c t f -> b t (c f)')
         return self.linear(x)
     
     def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=0)->list:
