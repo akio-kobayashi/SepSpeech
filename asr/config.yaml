@@ -57,3 +57,5 @@ model:
   num_decoder_layers: 8
   kernel_size: 31
   cntf_channels: 104
+  cntf_kernel_size: 7
+  
