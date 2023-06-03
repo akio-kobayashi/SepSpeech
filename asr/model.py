@@ -17,9 +17,9 @@ class LayerScale(nn.Module):
 
     def forward(self, x:Tensor) -> Tensor:
         # x: b c t f
-        x = rearrange('b c t f-> b t f c')
+        x = rearrange(x, 'b c t f-> b t f c')
         x = torch.mul(x, self.chwise_scaler)
-        x = rearrange('b t f c -> b c t f')
+        x = rearrange(x, 'b t f c -> b c t f')
         return x
 
 class DepthwiseConv(nn.Module):
