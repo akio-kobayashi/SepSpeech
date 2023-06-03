@@ -44,7 +44,7 @@ class ConvNeXTBlock(nn.Module):
         super().__init__()
         self.block = nn.Sequential(
             DepthwiseConv(in_channels, kernel_size, padding),
-            nn.LayerNorm(in_channels),
+            LayerNorm(in_channels),
             PointwiseConv(in_channels, in_channels*4),
             nn.GELU(),
             PointwiseConv(in_channels*4, in_channels),
@@ -80,7 +80,7 @@ class CNTF(nn.Module):
                 LayerNorm(2*cntf_channels),
                 nn.Conv2d(2*cntf_channels, 3*cntf_channels, kernel_size=(3,1), stride=(2,1)),
                 ConvNeXTBlock(3*cntf_channels, kernel_size),
-                nn.LayerNorm(3*cntf_channels),
+                LayerNorm(3*cntf_channels),
             )
             self.linear = nn.Linear(3*cntf_channels*dim, output_dim)
 
