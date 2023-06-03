@@ -93,7 +93,6 @@ class CNTF(nn.Module):
         x = self.cntf(x)
         # x (b c t f) -> (b t (c f))
         x = rearrange(x, 'b c t f -> b t (c f)')
-        print(x.shape) # (3x104x80)
         return self.linear(x)
     
     def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=0)->list:
@@ -175,8 +174,8 @@ class ASRModel(nn.Module):
         self.cntf = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_input, kernel_size=self.cntf_kernel_size)
         
         self.eos = config['eos']
-
-        if config['model_type'] == 'conformer':
+        self.model_type = config['model_type']
+        if self.model_type == 'conformer':
             self.encoder = Conformer(input_dim=self.dim_model, 
                                      num_heads=self.num_heads, 
                                      ffn_dim=self.dim_model, 
@@ -225,7 +224,10 @@ class ASRModel(nn.Module):
         z=self.dec_pe(self.dec_embed(labels_in))
         source_mask, target_mask, source_padding_mask, target_padding_mask = self.generate_masks(y, z, valid_input_lengths, label_lengths)
 
-        memory = self.encoder(y)
+        if self.model_type == 'conformer':
+            memory = self.encoder(y, torch.tensor(input_lengths))
+        else:
+            memory = self.encoder(y)
         y = self.decoder(z, memory, tgt_mask=target_mask,
                          memory_mask=None,
                          tgt_key_padding_mask=target_padding_mask,
