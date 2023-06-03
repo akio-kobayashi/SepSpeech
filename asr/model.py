@@ -79,7 +79,7 @@ class CNTF(nn.Module):
                 ConvNeXTBlock(2*cntf_channels, kernel_size),
                 LayerNorm(2*cntf_channels),
                 nn.Conv2d(2*cntf_channels, 3*cntf_channels, kernel_size=(3,1), stride=(2,1)),
-                ConvNeXTBlock(3*cntf_channels),
+                ConvNeXTBlock(3*cntf_channels, kernel_size),
                 nn.LayerNorm(3*cntf_channels),
             )
             self.linear = nn.Linear(3*cntf_channels*dim, output_dim)
