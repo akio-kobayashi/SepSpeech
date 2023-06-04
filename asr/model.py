@@ -98,7 +98,7 @@ class CNTF(nn.Module):
     def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=1.)->list:
         leng=[]
         for l in input_lengths:
-            np.floor((l + 2*padding - dilation * (kernel_size-1) - 1)/stride + 1)
+            l = np.floor((l + 2*padding - dilation * (kernel_size-1) - 1)/stride + 1)
             leng.append(l)
         return leng
 
