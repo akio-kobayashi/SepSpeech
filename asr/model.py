@@ -225,6 +225,8 @@ class ASRModel(nn.Module):
         source_mask, target_mask, source_padding_mask, target_padding_mask = self.generate_masks(y, z, valid_input_lengths, label_lengths)
 
         if self.model_type == 'conformer':
+            print(y.shape)
+            print(torch.tensor(valid_input_lengths).shape)
             memory = self.encoder(y, torch.tensor(valid_input_lengths))
         else:
             memory = self.encoder(y)
