@@ -226,6 +226,7 @@ class ASRModel(nn.Module):
 
         if self.model_type == 'conformer':
             print(y.shape)
+            print(input_lengths)
             print(valid_input_lengths)
             memory = self.encoder(y, torch.tensor(valid_input_lengths))
         else:
