@@ -52,7 +52,10 @@ class ConvNeXTBlock(nn.Module):
         )
     def forward(self, x:Tensor) -> Tensor:
         # (b 1 t f)
-        return self.block(x)
+        print(x.shape)
+        y = self.block(x)
+        print(y.shape)
+        return y
 
 class LayerNorm(nn.Module):
     def __init__(self, dim):
