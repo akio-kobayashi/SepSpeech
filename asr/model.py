@@ -68,7 +68,7 @@ class LayerNorm(nn.Module):
 def RepeatConvNeXTBlock(cntf_channels, kernel_size, repeat=3):
     repeats = []
     for n in range(repeat):
-        repeats += ConvNeXTBlock(cntf_channels, kernel_size)
+        repeats.append(ConvNeXTBlock(cntf_channels, kernel_size))
     return nn.Sequential(*repeats)
 
 class CNTF(nn.Module):
