@@ -171,7 +171,7 @@ class ASRModel(nn.Module):
         self.cntf_channels=config['model']['cntf_channels']
         self.kernel_size=config['model']['kernel_size']
         self.cntf_kernel_size=config['model']['cntf_kernel_size']
-        self.cntf = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_input, kernel_size=self.cntf_kernel_size)
+        self.cntf = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_model, kernel_size=self.cntf_kernel_size)
         
         self.eos = config['eos']
         self.model_type = config['model_type']
