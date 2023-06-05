@@ -50,12 +50,12 @@ checkpoint:
 model:
   dim_input: 80
   dim_model: 256 # conformer(L)
-  dim_output: 71
+#  dim_output: 71
   num_heads: 8
-  dim_feedforward: 256
+  dim_feedforward: 1024
   num_encoder_layers: 16
   num_decoder_layers: 8
-  kernel_size: 31
+  kernel_size: 3 #31
   cntf_channels: 104
   cntf_kernel_size: 7
-  
+
