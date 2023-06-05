@@ -68,10 +68,10 @@ class LayerNorm(nn.Module):
         x = rearrange(x, 'b t f c -> b c t f')
         return x
 
-def RepeatConvNeXTBlock(cntf_channels, kernel_size, repeat=3):
+def RepeatConvNeXTBlock(cntf_channels, kernel_size, padding=0, repeat=3):
     repeats = []
     for n in range(repeat):
-        repeats.append(ConvNeXTBlock(cntf_channels, kernel_size))
+        repeats.append(ConvNeXTBlock(cntf_channels, kernel_size, padding))
     return nn.Sequential(*repeats)
 
 class CNTF(nn.Module):
@@ -80,15 +80,15 @@ class CNTF(nn.Module):
         self.kernel_size=kernel_size
         self.repeat=repeat
         self.cntf = nn.Sequential(
-            nn.Conv2d(1, cntf_channels, kernel_size, stride=2),
+            nn.Conv2d(1, cntf_channels, kernel_size, stride=2, padding=kernel_size//2),
             LayerNorm(cntf_channels),
-            RepeatConvNeXTBlock(cntf_channels, kernel_size, repeat),
+            RepeatConvNeXTBlock(cntf_channels, kernel_size, padding=kernel_size//2, repeat=repeat),
             LayerNorm(cntf_channels),
-            nn.Conv2d(cntf_channels, 2*cntf_channels, kernel_size, stride=2),
-            RepeatConvNeXTBlock(2*cntf_channels, kernel_size, repeat),
+            nn.Conv2d(cntf_channels, 2*cntf_channels, kernel_size, stride=2, padding=kernel_size//2),
+            RepeatConvNeXTBlock(2*cntf_channels, kernel_size, padding=kernel_size//2, repeat=repeat),
             LayerNorm(2*cntf_channels),
-            nn.Conv2d(2*cntf_channels, 3*cntf_channels, kernel_size=(3,1), stride=(2,1)),
-            RepeatConvNeXTBlock(3*cntf_channels, kernel_size, repeat),
+            nn.Conv2d(2*cntf_channels, 3*cntf_channels, kernel_size=(3,1), stride=(2,1), padding=(kernel_size//2, 0)),
+            RepeatConvNeXTBlock(3*cntf_channels, kernel_size, padding=kernel_size//2, repeat=repeat),
             LayerNorm(3*cntf_channels),
         )
         self.linear = nn.Linear(3*cntf_channels, output_dim)
@@ -112,15 +112,15 @@ class CNTF(nn.Module):
         return leng
 
     def valid_lengths(self, input_lengths:list) -> list:
-        leng = self._valid_lengths(input_lengths, self.kernel_size, stride=2)   # Conv2d
+        leng = self._valid_lengths(input_lengths, self.kernel_size, stride=2, padding=self.kernel_size//2)   # Conv2d
         for n in range(self.repeat):
-            leng = self._valid_lengths(leng, self.kernel_size, stride=1)        # CNTF
-        leng = self._valid_lengths(leng, self.kernel_size, stride=2)            # Conv2d
+            leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
+        leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d
         for n in range(self.repeat):
-            leng = self._valid_lengths(leng, self.kernel_size, stride=1)        # CNTF
-        leng = self._valid_lengths(leng, self.kernel_size, stride=2)            # Conv2d
+            leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
+        leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d
         for n in range(self.repeat):
-            leng = self._valid_lengths(leng, self.kernel_size, stride=1)        # CNTF
+            leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
         return leng
 
 class PositionEncoding(nn.Module):
