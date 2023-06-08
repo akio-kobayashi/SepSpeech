@@ -107,13 +107,13 @@ class CNTF(nn.Module):
         return leng
 
     def valid_lengths(self, input_lengths:list) -> list:
-        leng = self._valid_lengths(input_lengths, self.kernel_size, stride=2, padding=self.kernel_size//2)   # Conv2d
+        leng = self._valid_lengths(input_lengths, self.kernel_size, stride=2, padding=self.kernel_size//2)   # Conv2d T=T//2
         for n in range(self.repeat):
             leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
-        leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d
+        leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d T=T//2
         for n in range(self.repeat):
             leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
-        leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d
+        leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d T=T//2
         for n in range(self.repeat):
             leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
         leng = [ l+2 for l in leng ]

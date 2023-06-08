@@ -10,6 +10,8 @@ from argparse import ArgumentParser
 import yaml
 import warnings
 warnings.filterwarnings('ignore')
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
 
 '''
  PyTorch Lightning用 将来変更する予定
@@ -40,12 +42,25 @@ def main(config:dict, checkpoint_path=None):
                                    shuffle=False, 
                                    collate_fn=lambda x: speech_dataset.data_processing(x))
     callbacks = [
-        pl.callbacks.ModelCheckpoint( **config['checkpoint'])
+        pl.callbacks.ModelCheckpoint( **config['checkpoint']),
+        EarlyStopping(monitor='valid_loss', patience=10, mode='min')
     ]
     logger = TensorBoardLogger(**config['logger'])
     trainer = pl.Trainer( callbacks=callbacks,
                           logger=logger,
                           **config['trainer'] )
+    # find inital learning rate
+    tuner = pl.tuner.Tuner(trainer)
+    lr_find_results = tuner.lr_find(
+        model,
+        train_dataloaders=train_loader,
+        min_lr=1.e-5,
+        max_lr=1.e-3
+    )
+    new_lr = lr_find_results.suggestion(skip_begin=20, skip_end=20)
+    model.hparams.lr = new_lr
+
+    # start training
     trainer.fit(model=model, train_dataloaders=train_loader,
                 val_dataloaders=valid_loader)
 
