@@ -52,10 +52,7 @@ class ConvNeXTBlock(nn.Module):
         )
     def forward(self, x:Tensor) -> Tensor:
         # (b 1 t f)
-        print(x.shape)
-        y = self.block(x)
-        print(y.shape)
-        return y
+        return self.block(x)
 
 class LayerNorm(nn.Module):
     def __init__(self, dim):
@@ -91,14 +88,12 @@ class CNTF(nn.Module):
             RepeatConvNeXTBlock(3*cntf_channels, kernel_size, padding=kernel_size//2, repeat=repeat),
             LayerNorm(3*cntf_channels),
         )
-        self.linear = nn.Linear(3*cntf_channels, output_dim)
+        self.linear = nn.Linear(3*cntf_channels*(dim//4), output_dim)
 
     def forward(self, x:Tensor) -> Tensor:
         # x (b t f -> b 1 t f)
-        print(x.shape)
         if x.dim() == 3:
             x = x.unsqueeze(1)
-        print(x.shape)
         x = self.cntf(x)
         # x (b c t f) -> (b t (c f))
         x = rearrange(x, 'b c t f -> b t (c f)')
@@ -121,6 +116,8 @@ class CNTF(nn.Module):
         leng = self._valid_lengths(leng, self.kernel_size, stride=2, padding=self.kernel_size//2)            # Conv2d
         for n in range(self.repeat):
             leng = self._valid_lengths(leng, self.kernel_size, stride=1, padding=self.kernel_size//2)        # CNTF
+        leng = [ l+2 for l in leng ]
+        
         return leng
 
 class PositionEncoding(nn.Module):
@@ -156,7 +153,7 @@ class CELoss(nn.Module):
     def __init__(self) -> None:
         super(CELoss, self).__init__()
         self.ce=nn.CrossEntropyLoss()
-
+        
     def forward(self, y_prd:Tensor, y_ref:Tensor, leng:list) -> Tensor:
         loss = 0.
         for b in range(y_prd.shape[0]):
@@ -169,6 +166,7 @@ class CELoss(nn.Module):
 class ASRModel(nn.Module):
     def __init__(self, config:dict) -> None:
         super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dim_input=config['model']['dim_input']
         self.dim_output=config['model']['dim_output']
         self.dim_model=config['model']['dim_model']
@@ -214,7 +212,8 @@ class ASRModel(nn.Module):
         self.decoder = nn.TransformerDecoder(decoder_layer,
                                              self.num_decoder_layers,
                                              nn.LayerNorm(self.dim_model))
-
+        self.linear = nn.Linear(self.dim_model, self.dim_output)
+        
         self.ce_loss = CELoss()
 
     def forward(self, inputs:Tensor, labels:Tensor, input_lengths:list, label_lengths:list) -> Tensor:
@@ -232,22 +231,21 @@ class ASRModel(nn.Module):
 
         # compute valid input lengths because CNTF reduce the original lengths according to downsampling
         valid_input_lengths = self.cntf.valid_lengths(input_lengths)
-
+        
         z=self.dec_pe(self.dec_embed(labels_in))
         source_mask, target_mask, source_padding_mask, target_padding_mask = self.generate_masks(y, z, valid_input_lengths, label_lengths)
 
         if self.model_type == 'conformer':
-            print(y.shape)
-            print(input_lengths)
-            print(valid_input_lengths)
-            memory = self.encoder(y, torch.tensor(valid_input_lengths))
+            memory,_ = self.encoder(y, torch.tensor(valid_input_lengths).cuda())
         else:
             memory = self.encoder(y)
         y = self.decoder(z, memory, tgt_mask=target_mask,
                          memory_mask=None,
                          tgt_key_padding_mask=target_padding_mask,
                          memory_key_padding_mask=source_padding_mask)
-            
+
+        y = self.linear(y)
+
         return y
 
     def generate_masks(self, src:Tensor, tgt:Tensor, src_len:list, tgt_len:list) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
@@ -263,7 +261,7 @@ class ASRModel(nn.Module):
             src_padding_mask[b, :src_len[b]]=False
             tgt_padding_mask[b, :tgt_len[b]]=False
 
-        return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
+        return src_mask.to(self.device), tgt_mask.to(self.device), src_padding_mask.to(self.device), tgt_padding_mask.to(self.device)
 
     def generate_square_subsequent_mask(self, seq_len:int) -> Tensor:
         mask = (torch.triu(torch.ones((seq_len, seq_len))) == 1).transpose(0, 1)
