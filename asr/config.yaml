@@ -1,5 +1,6 @@
 model_type: conformer
 eos: </s>
+bos: <s>
 # dataset
 dataset:
   process:

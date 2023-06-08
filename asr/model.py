@@ -183,7 +183,8 @@ class ASRModel(nn.Module):
         self.cntf_kernel_size=config['model']['cntf_kernel_size']
         self.cntf = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_model, kernel_size=self.cntf_kernel_size)
         
-        self.eos = config['eos']
+        self.bos = -1
+        self.eos = -1
         self.model_type = config['model_type']
         if self.model_type == 'conformer':
             self.encoder = Conformer(input_dim=self.dim_model, 
@@ -215,6 +216,10 @@ class ASRModel(nn.Module):
         self.linear = nn.Linear(self.dim_model, self.dim_output)
         
         self.ce_loss = CELoss()
+    
+    def set_special_tokens(self, bos_id, eos_id):
+        self.bos=bos_id
+        self.eos=eos_id
 
     def forward(self, inputs:Tensor, labels:Tensor, input_lengths:list, label_lengths:list) -> Tensor:
 
@@ -269,6 +274,7 @@ class ASRModel(nn.Module):
         return mask
 
     def greedy_decode(self, src:Tensor, src_len:int) -> list:
+        assert self.bos != -1
         with torch.no_grad():
             #src_padding_mask = torch.ones(1, src.shape[1], dtype=bool)
             #src_padding_mask[:, :src_len]=False
@@ -276,8 +282,9 @@ class ASRModel(nn.Module):
             y = self.cntf(src)
             #memory = self.transformer.encoder(y, src_key_padding_mask=src_padding_mask)
             memory = self.encoder(y)
-            ys=torch.ones((1, 1), dtype=torch.int)
-            ys*=2
+            ys = torch.tensor([[self.bos]], dtype=torch.int)
+            #ys=torch.ones((1, 1), dtype=torch.int)
+            #ys*=2
             memory_mask=None
         for i in range(self.decode_max_len - 1):
             with torch.no_grad():

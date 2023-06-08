@@ -19,9 +19,9 @@ def main(config:dict, checkpoint_path:str):
 
     assert checkpoint_path is not None:
 
-    model = LitASR.load_from_checkpoint(checkpoint_path, config=config)
-
     tokenizer = ASRTokenizer(config['tokenizer'], config['max_length'])
+    model = LitASR.load_from_checkpoint(checkpoint_path, config=config, tokenizer=tokenizer)
+    model.model.set_special_tokens(tokenizer.text2token(config['bos'])[0], tokenizer.text2token(config['eos'])[0])
 
     test_dataset = SpeechDataset(**config['dataset']['test'], 
                                   **config['dataset']['segment'],
@@ -41,7 +41,7 @@ def main(config:dict, checkpoint_path:str):
             output = tokenizer.token2text(output) # w/o special tokens
             # split text for CER computation
             output = ' '.join(list(output))
-            print(f'{output} ({keys[0]})')
+            f.write(f'{output} ({keys[0]})\n')
 
 if __name__ == '__main__':
     parser = ArgumentParser()
