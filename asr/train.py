@@ -16,10 +16,10 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 '''
  PyTorch Lightning用 将来変更する予定
 '''
-def main(config:dict, checkpoint_path=None):
+def main(config:dict, args):
 
-    if checkpoint_path is not None:
-        model = LitASR.load_from_checkpoint(checkpoint_path, config=config)
+    if args.checkpoint is not None:
+        model = LitASR.load_from_checkpoint(args.checkpoint, config=config)
     else:
         model = LitASR(config)
         
@@ -50,15 +50,16 @@ def main(config:dict, checkpoint_path=None):
                           logger=logger,
                           **config['trainer'] )
     # find inital learning rate
-    tuner = pl.tuner.Tuner(trainer)
-    lr_find_results = tuner.lr_find(
-        model,
-        train_dataloaders=train_loader,
-        min_lr=1.e-5,
-        max_lr=1.e-3
-    )
-    new_lr = lr_find_results.suggestion(skip_begin=20, skip_end=20)
-    model.hparams.lr = new_lr
+    if args.lr_find:
+        tuner = pl.tuner.Tuner(trainer)
+        lr_find_results = tuner.lr_find(
+            model,
+            train_dataloaders=train_loader,
+            min_lr=1.e-5,
+            max_lr=1.e-3
+        )
+        new_lr = lr_find_results.suggestion(skip_begin=20, skip_end=20)
+        model.hparams.lr = new_lr
 
     # start training
     trainer.fit(model=model, train_dataloaders=train_loader,
@@ -68,10 +69,11 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, default=None)
+    parser.add_argument('--lr_find', action='store_true')
     args=parser.parse_args()
 
     torch.set_float32_matmul_precision('high')
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
 
-    main(config, args.checkpoint)
+    main(config, args)

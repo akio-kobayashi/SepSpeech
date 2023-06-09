@@ -7,7 +7,7 @@ dataset:
     batch_size: 8
     num_workers: 2
   segment:
-    segment: 10
+    segment: 20
     sample_rate: 16000
   train:
     csv_path: '/export/20230515/train_braille.csv'
@@ -37,9 +37,9 @@ trainer:
   profiler: 'simple'
   gradient_clip_val: 5.
 optimizer:
-  lr: 1.e-4
+  lr: 4.e-5
 scheduler:
-  max_lr: 1.e-3
+  max_lr: 1.e-4
   epochs: 100
   steps_per_epoch: 1000
 logger:
@@ -54,12 +54,12 @@ checkpoint:
   every_n_epochs: 1
 model:
   dim_input: 80
-  dim_model: 256 #512 # conformer(L)
+  dim_model: 512 #256 # conformer(L)
   dim_output: 71 # number of alphabets
   num_heads: 8
   dim_feedforward: 1024
   num_encoder_layers: 16
-  num_decoder_layers: 8 #16
+  num_decoder_layers: 16 #8
   kernel_size: 31 #3 #31
   cntf_channels: 104
   cntf_kernel_size: 7
