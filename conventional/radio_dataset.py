@@ -64,11 +64,20 @@ class RadioDataset(torch.utils.data.Dataset):
 
         # augmentation
         self.lowpass = LowPassRadio(config).cuda()
-        self.white_noise = WhiteNoiseAugment(config).cuda()
-        self.narrow_band = NarrowBandNoiseAugment(config).cuda()
+        if config['augment']['white_noise']['use']:
+            self.white_noise = WhiteNoiseAugment(config).cuda()
+        else:
+            self.white_noise = None
+        if config['augment']['narrow_band']['use']:
+            self.narrow_band = NarrowBandNoiseAugment(config).cuda()
+        else:
+            self.narrow_band = None
         #self.random_amp = RandomAmplitudeModulationAugment(config)
-        self.fading_augment = FadingAugment(config).cuda()
-        
+        if config['augment']['fading']['use']:
+            self.fading_augment = FadingAugment(config).cuda()
+        else:
+            self.fading_augment = None
+            
         self.divisor = divisor
         
     def __len__(self) -> int:
@@ -86,8 +95,18 @@ class RadioDataset(torch.utils.data.Dataset):
             if self.divisor > 0 and source.shape[-1] % self.divisor > 0:
                 source = sd.padding(source, self.divisor)
 
-            noise = self.white_noise(source) + self.narrow_band(source)
-            mixture = self.fading_augment(self.lowpass(source)) + noise
+            if self.white_noise is not None:
+                noise = self.white_noise(source)
+            else:
+                noise = torch.zero_like(source)
+            if self.narrow_band is not None:
+                noise += self.narrow_band(source)
+
+            if self.fading_augment is not None:
+                mixture = self.fading_augment(self.lowpass(source)) + noise
+            else:
+                mixture = self.lowpass(source) + noise
+                
             #mixture = self.random_amp(self.lowpass(source)) + noise
         
         return torch.t(mixture), torch.t(source)
