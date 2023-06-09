@@ -1,5 +1,6 @@
 model_type: conformer
-eos: </s>
+eos: '</s>'
+bos: '<s>'
 # dataset
 dataset:
   process:
@@ -31,12 +32,16 @@ augment:
 trainer:
   accelerator: 'auto'
   accumulate_grad_batches: 5
-  max_epochs: 400
+  max_epochs: 100
   precision: '16-mixed'
   profiler: 'simple'
   gradient_clip_val: 5.
 optimizer:
   lr: 1.e-4
+scheduler:
+  max_lr: 1.e-3
+  epochs: 100
+  steps_per_epoch: 1000
 logger:
   save_dir: './'
   version: 1
@@ -49,13 +54,12 @@ checkpoint:
   every_n_epochs: 1
 model:
   dim_input: 80
-  dim_model: 256 # conformer(L)
-#  dim_output: 71
+  dim_model: 512 # conformer(L)
+  dim_output: 71 # number of alphabets
   num_heads: 8
   dim_feedforward: 1024
   num_encoder_layers: 16
-  num_decoder_layers: 8
-  kernel_size: 3 #31
+  num_decoder_layers: 16
+  kernel_size: 31 #3 #31
   cntf_channels: 104
   cntf_kernel_size: 7
-
