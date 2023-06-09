@@ -54,12 +54,15 @@ checkpoint:
   every_n_epochs: 1
 model:
   dim_input: 80
-  dim_model: 512 # conformer(L)
+  dim_model: 256 #512 # conformer(L)
   dim_output: 71 # number of alphabets
   num_heads: 8
   dim_feedforward: 1024
   num_encoder_layers: 16
-  num_decoder_layers: 16
+  num_decoder_layers: 8 #16
   kernel_size: 31 #3 #31
   cntf_channels: 104
   cntf_kernel_size: 7
+decode:
+  decode_max_len: 256
+  

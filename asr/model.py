@@ -216,7 +216,9 @@ class ASRModel(nn.Module):
         self.linear = nn.Linear(self.dim_model, self.dim_output)
         
         self.ce_loss = CELoss()
-    
+
+        self.decode_max_len = config['decode']['decode_max_len']
+        
     def set_special_tokens(self, bos_id, eos_id):
         self.bos=bos_id
         self.eos=eos_id
@@ -273,7 +275,10 @@ class ASRModel(nn.Module):
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def greedy_decode(self, src:Tensor, src_len:int) -> list:
+    def greedy_decode(self, src:Tensor, input_lengths:int) -> list:
+
+        valid_input_lengths = self.cntf.valid_lengths(input_lengths)
+        
         assert self.bos != -1
         with torch.no_grad():
             #src_padding_mask = torch.ones(1, src.shape[1], dtype=bool)
@@ -281,7 +286,10 @@ class ASRModel(nn.Module):
             #y = self.enc_pe(self.prenet(src))
             y = self.cntf(src)
             #memory = self.transformer.encoder(y, src_key_padding_mask=src_padding_mask)
-            memory = self.encoder(y)
+            if self.model_type == 'conformer':
+                memory,_ = self.encoder(y, torch.tensor(valid_input_lengths).cuda())
+            else:
+                memory = self.encoder(y)
             ys = torch.tensor([[self.bos]], dtype=torch.int)
             #ys=torch.ones((1, 1), dtype=torch.int)
             #ys*=2
@@ -289,13 +297,13 @@ class ASRModel(nn.Module):
         for i in range(self.decode_max_len - 1):
             with torch.no_grad():
                 mask=self.generate_square_subsequent_mask(ys.shape[1])
-                z = self.dec_pe(self.dec_embed(ys))
-                z = self.decoder(z, memory, tgt_mask=mask, memory_mask=memory_mask)
-                z = F.log_softmax(self.fc(z), dim=-1)
+                z = self.dec_pe(self.dec_embed(ys.cuda()))
+                z = self.decoder(z, memory, tgt_mask=mask.cuda(), memory_mask=memory_mask)
+                z = F.log_softmax(self.linear(z), dim=-1)
                 # get maximum index from last item in tensor
                 z = torch.argmax(z[:, -1, :]).reshape(1, 1)
 
-                ys = torch.cat((ys, z), dim=1) #(1, T+1)
+                ys = torch.cat((ys.cuda(), z), dim=1) #(1, T+1)
 
                 if z == self.eos:
                     break
