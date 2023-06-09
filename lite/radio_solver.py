@@ -46,19 +46,19 @@ class LitDenoiser(pl.LightningModule):
         d = {}
         _loss = 0.
         if self.stft_loss is not None:
-            _stft_loss1, _stft_loss2 = self.stft_loss(src_hat, sources)
+            _stft_loss1, _stft_loss2 = self.stft_loss(estimates, targets)
             _loss += self.stft_loss_weight * (_stft_loss1 + _stft_loss2)
-            d[prefix+'stft_loss'] = _stft_loss1 + _stft_loss2]
+            d[prefix+'stft_loss'] = _stft_loss1 + _stft_loss2
         if self.pesq_loss is not None:
-            _pesq_loss = self.pesq_loss(sources, src_hat)
+            _pesq_loss = self.pesq_loss(targets, estimates)
             _loss += self.pesq_loss_weight * _pesq_loss
             d[prefix+'pesq_loss'] = _pesq_loss
         if self.sdr_loss is not None:
-            _sdr_loss = self.sdr_loss(src_hst, sources)
+            _sdr_loss = self.sdr_loss(estimates, targets)
             _loss += self.sdr_loss_weight * _sdr_loss
             d[prefix+'sdr_loss'] = _sdr_loss
         if self.stoi_loss is not None:
-            _stoi_loss = self.stoi_loss(src_hat, sources)
+            _stoi_loss = self.stoi_loss(estimates, targets)
             _loss += self.stoi_loss_weight * _stoi_loss
             d[prefix+'stoi_loss'] = _stoi_loss
         if valid is True:
