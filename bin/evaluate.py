@@ -40,12 +40,6 @@ def padding(x, divisor):
 def read_audio(path):
     wave, sr = torchaudio.load(path)
     return wave
-    #mx = torch.max(torch.abs(wave))
-    #wave = wave/torch.max(torch.abs(wave))
-    #std, mean = torch.std_mean(wave)
-    #wave = (wave - mean)/std
-    #return wave, mean, std
-    #return torch.t(wave)
 
 def main(args):
 
@@ -116,12 +110,6 @@ def main(args):
             est_pesq.append(_pesq(estimate.cuda(), source.cuda()).cpu().detach().numpy())
             est_stoi.append(_stoi(estimate.cuda(), source.cuda()).cpu().detach().numpy())
             est_sdr.append(_sdr(estimate.cuda(), source.cuda()).cpu().detach().numpy())
-            
-            #std, mean = torch.std_mean(estimate)
-            #estimate = (estimate-mean)/std
-            #estimate = estimate/torch.max(torch.abs(estimate)) * torch.max(torch.abs(mixture))
-            #estimate = torchaudio.functional.gain(estimate / torch.max(torch.abs(estimate)), -6.0)
-            #estimate *= std
             
             estimate_outdir = args.output_dir
             if not os.path.exists(estimate_outdir):

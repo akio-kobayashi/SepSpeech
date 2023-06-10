@@ -1,5 +1,4 @@
-model_type: tasnet
-# dataset
+model_type: tasnet # tasnet/unet/unet2
 dataset:
   process:
     batch_size: 8
@@ -11,13 +10,18 @@ dataset:
   train:
     csv_path: 'audio/csv/train_3p.csv'
     enroll_path: 'audio/csv/enroll_3p.csv'
+    noise_path: 'audio/csv/noise_train.csv' # on-the-fly mixing
   valid:  
     csv_path: 'audio/csv/valid_3p.csv'
     enroll_path: 'audio/csv/enroll_3p.csv'
+    noise_path: 'audio/csv/noise_valid.csv'
   test:
     csv_path: 
     enroll_path: 
-# trainer parameters
+    noise_path:
+  # on-the-fly mixing
+  min_snr: 0
+  max_snr: 20
 trainer:
   accelerator: 'auto'
   accumulate_grad_batches: 5
@@ -37,12 +41,24 @@ checkpoint:
   save_top_k: 1
   mode: 'min'
   every_n_epochs: 1
-# training parameters
 loss:
-  lambda1: 1.0
-  lambda2: 0.1
+  ce_loss:
+    weight: 0.1
+  stft_loss:
+    use: True
+    weight: 1.0
+  pesq_loss:
+    use: False
+    weight: 1.0
+  sdr_loss:
+    use: False
+    weight: 1.0
+  stoi_loss:
+    use: False
+    weight: 1.0
 speaker:
   adpt_type: none
+# models
 tasnet:
   kernel_size: 20
   in_channels: 256
@@ -53,7 +69,7 @@ tasnet:
   num_repeats: 4
   num_speakers: 307
   resample: 1
-unet:
+unet: #unet/unet2
   attention: True
   normalize: False #True
   floor: 0.001
@@ -70,30 +86,3 @@ unet:
   reference: 0.1
   causal: True
   num_speakers: 307
-diffusion:
-  timesteps: 200
-  beta_start: 0.001
-  beta_end: 0.02
-# sepformer parameters
-sepformer:
-  # positional encoding
-  max_len: 80000
-  #max_len: 10
-  # encoder/decoder conv filters
-  channels: 256 #512 #128
-  kernel_size: 16
-  stride: 8
-  # chunking samples
-  chunk_size: 250
-  # intra- & inter- Transformers
-  d_model: 256 #128
-  nhead: 8
-  dim_feedforward: 1024
-  layer_norm_eps: 1.e-8
-  num_layers: 8 #4
-  # sepformers
-  num_sepformer_layers: 2 #1
-  # speakers
-  num_speakers: 307
-  # dropout (all modules)
-  dropout: 0.1
