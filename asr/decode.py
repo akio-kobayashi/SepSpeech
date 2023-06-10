@@ -34,9 +34,13 @@ def main(config:dict, checkpoint_path:str, output:str):
                                   shuffle=False, 
                                   collate_fn=lambda x: speech_dataset.data_processing(x))
     model.cuda().eval()
+    npz = np.load(config['analysis']['global_mean_std'])
+    mean, std = torch.from_numpy(npz['mean']), torch.from_numpy(npz['std'])
+    
     with open(output, 'w') as f:
         for batch_idx, batch in enumerate(test_loader):
             inputs, _, input_lengths, _, keys = batch
+            inputs = (inputs - mean)/std
             output = model.decode(inputs.cuda(), input_lengths)
 
             output = tokenizer.token2text(output) # w/o special tokens
