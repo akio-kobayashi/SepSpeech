@@ -19,7 +19,6 @@ from typing import Tuple
 from .bark import BarkScale
 from .loudness import Loudness
 
-
 class PesqLoss(torch.nn.Module):
     """Perceptual Evaluation of Speech Quality
 
@@ -101,7 +100,7 @@ class PesqLoss(torch.nn.Module):
         #    torch.as_tensor(out, dtype=torch.float32), requires_grad=False
         #)
         self.power_filter = Parameter(
-            torch.from_numpy(out).astype(float),
+            torch.from_numpy(out).to(torch.float32),
             requires_grad=False,
         )
 
@@ -327,3 +326,11 @@ class PesqLoss(torch.nn.Module):
         d_symm, d_asymm = self.raw(ref, deg)
 
         return self.factor * (0.1 * d_symm + 0.0309 * d_asymm)
+
+if __name__ == "__main__":
+    _pesq = PesqLoss(factor=1.)
+    estimate = torch.randn(1, 100000)
+    target = torch.randn(1, 100000)
+    value = _pesq(target, estimate)
+    print(value.cpu().detach().numpy())
+    

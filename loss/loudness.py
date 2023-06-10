@@ -2,6 +2,7 @@
 
 import torch
 from torch.nn import Parameter
+from torch import Tensor
 import numpy as np
 
 from torchtyping import TensorType
@@ -58,8 +59,8 @@ class Loudness(torch.nn.Module):
 
     @typechecked
     def total_audible(
-        self, tensor: TensorType["batch", "frame", "band"], factor: float = 1.0
-    ) -> TensorType["batch", "frame"]:
+        self, tensor, factor: float = 1.0
+    ) -> Tensor:
         """Calculate total audible energy for each frame over all bands
 
         Parameters
@@ -83,9 +84,9 @@ class Loudness(torch.nn.Module):
     @typechecked
     def time_avg_audible(
         self,
-        tensor: TensorType["batch", "frame", "band"],
-        silent: TensorType["batch", "frame"],
-    ) -> TensorType["batch", "band"]:
+        tensor,
+        silent,
+    ) -> Tensor:
         """Calculate arithmetic mean of audible energy for each band over all frames
 
         Parameters
@@ -108,8 +109,8 @@ class Loudness(torch.nn.Module):
 
     @typechecked
     def forward(
-        self, pow_dens: TensorType["batch", "frame", "band"]
-    ) -> TensorType["batch", "frame", "band"]:
+        self, pow_dens
+    ) -> Tensor:
         """Transform Bark scaled power spectrogram to audible energy per band
 
         Parameters

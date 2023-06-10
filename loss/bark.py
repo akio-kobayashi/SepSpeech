@@ -2,6 +2,7 @@
 
 import math
 import torch
+from torch import Tensor
 from torch.nn.parameter import Parameter
 from scipy import interpolate
 import numpy as np
@@ -176,8 +177,8 @@ class BarkScale(torch.nn.Module):
 
     @typechecked
     def weighted_norm(
-        self, tensor: TensorType["batch", "frame", "band"], p: float = 2
-    ) -> TensorType["batch", "frame"]:
+        self, tensor, p: float = 2
+    ) -> Tensor:
         """Calculates the p-norm taking band width into consideration
 
         Parameters
@@ -198,8 +199,8 @@ class BarkScale(torch.nn.Module):
 
     @typechecked
     def forward(
-        self, tensor: TensorType["batch", "frame", "band"]
-    ) -> TensorType["batch", "frame", "bark"]:
+        self, tensor
+    ) -> Tensor:
         """Converts a Hz-scaled spectrogram to a Bark-scaled spectrogram
 
         Parameters
