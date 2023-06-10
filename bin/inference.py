@@ -15,7 +15,7 @@ def main(config, args):
     model.eval()
 
     mixture, sr = torchaudio.load(args.mixture)
-    mx = torch.max(mixture)
+    #mx = torch.max(mixture)
     std, mean = torch.std_mean(mixture, dim=-1)
     mixture = (mixture-mean)/std
     enroll, sr = torchaudio.load(args.enroll)
@@ -24,9 +24,10 @@ def main(config, args):
     length = len(mixture.t())
     with torch.no_grad():
         output, _ = model(mixture.cuda(), enroll.cuda())
-    std, mean = torch.std_mean(output, dim=-1)
-    output /= std
-    output = output/torch.max(output) * mx
+        output *= std
+    #std, mean = torch.std_mean(output, dim=-1)
+    #output /= std
+    #output = output/torch.max(output) * mx
     torchaudio.save(filepath=args.output, src=output.to('cpu'), sample_rate=sr)
 
 if __name__ == '__main__':
