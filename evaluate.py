@@ -39,11 +39,12 @@ def padding(x, divisor):
 
 def read_audio(path):
     wave, sr = torchaudio.load(path)
+    return wave
     #mx = torch.max(torch.abs(wave))
     #wave = wave/torch.max(torch.abs(wave))
-    std, mean = torch.std_mean(wave)
-    wave = (wave - mean)/std
-    return wave
+    #std, mean = torch.std_mean(wave)
+    #wave = (wave - mean)/std
+    #return wave, mean, std
     #return torch.t(wave)
 
 def main(args):
@@ -85,10 +86,14 @@ def main(args):
             mixtures.append(row['mixture'])
             sources.append(row['source'])
 
-            mixture, source = read_audio(row['mixture']),read_audio(row['source'])
+            mixture = read_audio(row['mixture'])
+            source = read_audio(row['source'])
             mix_pesq.append(_pesq(mixture.cuda(), source.cuda()).cpu().detach().numpy())
             mix_stoi.append(_stoi(mixture.cuda(), source.cuda()).cpu().detach().numpy())
             mix_sdr.append(_sdr(mixture.cuda(), source.cuda()).cpu().detach().numpy())
+
+            mix_std, mix_mean = torch.std_mean(mixture)
+            src_std, src_mean = torch.std_mean(source)
             
             mixture_original_length = mixture.shape[-1]
             source_original_length = source.shape[-1]
@@ -96,19 +101,27 @@ def main(args):
 
             enroll_path = row_enr['source']
             enroll = read_audio(enroll_path)
+            std, mean = torch.std_mean(enroll)
+            enroll = (enroll - mean)/std
             enrolls.append(enroll_path)
 
-            # padding
+            # normalize and padding
+            mixture = (mixture - mix_mean)/mix_std
             if divisor > 0 and mixture_original_length % divisor > 0:
                 mixture = padding(mixture, divisor)
 
             estimate, _ = model(mixture.to(device), enroll.to(device))
             estimate = estimate[:, :mixture_original_length]
-
-            std, mean = torch.std_mean(estimate)
-            estimate = (estimate-mean)/std
+            estimate *= mix_std
+            est_pesq.append(_pesq(estimate.cuda(), source.cuda()).cpu().detach().numpy())
+            est_stoi.append(_stoi(estimate.cuda(), source.cuda()).cpu().detach().numpy())
+            est_sdr.append(_sdr(estimate.cuda(), source.cuda()).cpu().detach().numpy())
+            
+            #std, mean = torch.std_mean(estimate)
+            #estimate = (estimate-mean)/std
             #estimate = estimate/torch.max(torch.abs(estimate)) * torch.max(torch.abs(mixture))
-            estimate = torchaudio.functional.gain(estimate / torch.max(torch.abs(estimate)), -6.0)
+            #estimate = torchaudio.functional.gain(estimate / torch.max(torch.abs(estimate)), -6.0)
+            #estimate *= std
             
             estimate_outdir = args.output_dir
             if not os.path.exists(estimate_outdir):
@@ -124,12 +137,6 @@ def main(args):
             est_decoded.append(decoded['text'])
             decoded = decoder.transcribe(row['mixture'], verbose=False, language='ja')
             mix_decoded.append(decoded['text'])
-            
-            mixture = mixture[:, :mixture_original_length]
-            
-            est_pesq.append(_pesq(estimate.cuda(), source.cuda()).cpu().detach().numpy())
-            est_stoi.append(_stoi(estimate.cuda(), source.cuda()).cpu().detach().numpy())
-            est_sdr.append(_sdr(estimate.cuda(), source.cuda()).cpu().detach().numpy())
             
     df_out['key'], df_out['mixture'], df_out['source'], df_out['enroll'], df_out['estimate'] = keys, mixtures, sources, enrolls, estimates
     df_out['mix_pesq'], df_out['mix_stoi'], df_out['mix_sdr'] = mix_pesq, mix_stoi, mix_sdr
