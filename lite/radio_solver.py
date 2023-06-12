@@ -2,6 +2,7 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 import pytorch_lightning as pl
+import numpy as np
 from models.radio_unet import UNetRadio
 #from models.conv_tasnet import ConvTasNet
 from loss.stft_loss import MultiResolutionSTFTLoss
@@ -9,6 +10,7 @@ from loss.pesq_loss import PesqLoss
 from loss.stoi_loss import NegSTOILoss
 from loss.sdr_loss import NegativeSISDR
 from typing import Tuple
+import os,sys
 import utils.cooldown
 
 '''
@@ -34,6 +36,9 @@ class LitDenoiser(pl.LightningModule):
         if config['loss']['stoi']['use']:
             self.stoi_loss = NegSTOILoss(sample_rate=16000, extended=config['loss']['stoi']['extended'])
             self.stoi_loss_weight = config['loss']['stoi']['weight']
+
+        self.dict_path = os.path.join(config['logger']['save_dir'], config['logger']['name'])
+        self.dict_path = os.path.join(self.dict_path, 'version_'+str(config['logger']['version']))
 
         self.valid_step_loss=[]
         self.valid_epoch_loss=[]
@@ -103,8 +108,10 @@ class LitDenoiser(pl.LightningModule):
         _loss = np.mean(self.valid_step_loss)
         self.valid_epoch_loss.append(_loss)
         if np.min(self.valid_epoch_loss) == _loss:
-            torch.save_state_dict()
-    
+            path = os.path.join(self.dict_path + 'model_epoch='+str(self.current_epoch))
+            torch.save(self.model.to('cpu').state_dict(), path)
+            self.model.to('gpu')
+            
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
                                      **self.config['optimizer'])

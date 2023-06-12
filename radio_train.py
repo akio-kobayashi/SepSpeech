@@ -14,10 +14,14 @@ warnings.filterwarnings('ignore')
 '''
  PyTorch Lightning用 将来変更する予定
 '''
-def main(config:dict, checkpoint_path=None):
+def main(config:dict, checkpoint_path=None, dict_path=None):
 
     if checkpoint_path is not None:
         model = LitDenoiser.load_from_checkpoint(checkpoint_path, config=config)
+    elif dict_path is not None:
+        model.model.to('cpu')
+        model.model.load_dict(torch.load(dict_path), map_location=torch.device('cpu'))
+        model.model.to('gpu')
     else:
         model = LitDenoiser(config)
 
@@ -58,6 +62,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, default=None)
+    parser.add_argument('--dict_path', type=str, default=None)
     parser.add_argument('--gpus', nargs='*', type=int)
     args=parser.parse_args()
 
@@ -65,4 +70,4 @@ if __name__ == '__main__':
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
 
-    main(config, args.checkpoint)
+    main(config, args.checkpoint, args.dict_path)
