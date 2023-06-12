@@ -34,7 +34,10 @@ class LitDenoiser(pl.LightningModule):
         if config['loss']['stoi']['use']:
             self.stoi_loss = NegSTOILoss(sample_rate=16000, extended=config['loss']['stoi']['extended'])
             self.stoi_loss_weight = config['loss']['stoi']['weight']
-            
+
+        self.valid_step_loss=[]
+        self.valid_epoch_loss=[]
+        
         self.save_hyperparameters()
 
     def forward(self, mix:Tensor) -> Tensor:
@@ -75,7 +78,7 @@ class LitDenoiser(pl.LightningModule):
         _loss, d = self.compute_loss(src_hat, sources, valid=False)
         self.log_dict(d)
 
-        utils.cooldown.coolGPU()
+        #utils.cooldown.coolGPU()
 
         return _loss
 
@@ -92,15 +95,15 @@ class LitDenoiser(pl.LightningModule):
         src_hat = self.forward(mixtures)
         _loss, d = self.compute_loss(src_hat, sources, valid=True)
         self.log_dict(d)
-
+        self.valid_step_loss.append(_loss.item())
+        
         return _loss
 
-    '''
-    def on_validation_epoch_end(outputs:Tensor):
-        #agv_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        #tensorboard_logs={'val_loss': agv_loss}
-        #return {'avg_loss': avg_loss, 'log': tensorboard_logs}
-    '''
+    def on_validation_epoch_end(self, outputs:Tensor):
+        _loss = np.mean(self.valid_step_loss)
+        self.valid_epoch_loss.append(_loss)
+        if np.min(self.valid_epoch_loss) == _loss:
+            torch.save_state_dict()
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
