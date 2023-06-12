@@ -110,7 +110,7 @@ class LitDenoiser(pl.LightningModule):
         if self.current_epoch > 1 and np.min(self.valid_epoch_loss) == _loss:
             path = os.path.join(self.dict_path + 'model_epoch='+str(self.current_epoch))
             torch.save(self.model.to('cpu').state_dict(), path)
-            self.model.to('gpu')
+            self.model.to('cuda')
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
