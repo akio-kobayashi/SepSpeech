@@ -104,7 +104,7 @@ class LitDenoiser(pl.LightningModule):
         
         return _loss
 
-    def on_validation_epoch_end(self, outputs:Tensor):
+    def on_validation_epoch_end(self):
         _loss = np.mean(self.valid_step_loss)
         self.valid_epoch_loss.append(_loss)
         if self.current_epoch > 1 and np.min(self.valid_epoch_loss) == _loss:
