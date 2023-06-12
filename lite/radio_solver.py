@@ -107,11 +107,11 @@ class LitDenoiser(pl.LightningModule):
     def on_validation_epoch_end(self, outputs:Tensor):
         _loss = np.mean(self.valid_step_loss)
         self.valid_epoch_loss.append(_loss)
-        if np.min(self.valid_epoch_loss) == _loss:
+        if self.current_epoch > 1 and np.min(self.valid_epoch_loss) == _loss:
             path = os.path.join(self.dict_path + 'model_epoch='+str(self.current_epoch))
             torch.save(self.model.to('cpu').state_dict(), path)
             self.model.to('gpu')
-            
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
                                      **self.config['optimizer'])
