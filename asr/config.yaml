@@ -14,7 +14,7 @@ dataset:
   valid:  
     csv_path: '/export/20230515/valid_braille.csv'
   test:
-    csv_path: '/export/20230515/test_braille.csv'
+    csv_path: '/export/20230515/valid_braille.csv' #'/export/20230515/test_braille.csv'
   tokenizer: '/export/20230515/braille_tokenizer/vocab.json'
   max_length: 1000
 analysis:
@@ -32,7 +32,7 @@ augment:
 trainer:
   accelerator: 'auto'
   accumulate_grad_batches: 5
-  max_epochs: 100
+  max_epochs: 200
   precision: '16-mixed'
   profiler: 'simple'
   gradient_clip_val: 5.
@@ -40,11 +40,11 @@ optimizer:
   lr: 4.e-5
 scheduler:
   max_lr: 1.e-4
-  epochs: 100
+  epochs: 200
   steps_per_epoch: 1000
 logger:
   save_dir: './'
-  version: 1
+  version: 2
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'

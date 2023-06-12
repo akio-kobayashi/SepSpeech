@@ -8,6 +8,7 @@ from einops import rearrange
 from torchaudio.models import Conformer
 from torch import Tensor
 from typing import Tuple
+from einops import rearrange
 
 class LayerScale(nn.Module):
     def __init__(self, dim:int, scale:float) -> None:
@@ -138,6 +139,72 @@ class PositionEncoding(nn.Module):
         x = x + self.pe[:, :x.shape[1], :]
         return self.dropout(x)
 
+class CausalConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1, **kwargs):
+        padding = (kernel_size-1) * dilation
+        self.conv=nn.Conv2d(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            **kwargs
+        )
+    
+    def forward(self, x):
+        return self.conv(x)
+    
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels:int, out_channels:int, kernel_size:int, stride:int, dropout:float) -> None
+        self.layers = nn.Sequential(
+            nn.LayerNorm(in_channels),
+            nn.ReLU(),
+            CausalConv2d(in_channels, out_channels, kernel_size, stride=stride)
+            nn.Dropout(dropout),
+            nn.LayerNorm(out_channels),
+            nn.ReLU(),
+            CausalConv2d(out_channels, out_channels, kernel_size, stride=1),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.layers(x)
+    
+class ConvBasedFilter(nn.Module):
+    def __init__(self, config:dict)->None:
+        super().__init__()
+        self.layers = nn.Sequential(
+            ConvBlock(1, 32, 5, stride=2, dropout=0.1),
+            ConvBlock(32, 256, 3, stride=2, dropout=0.1),
+            ConvBlock(256, 512, 3, stride=1, dropout=0.1)
+        )
+        in_channels = config['model']['dim_input'] // 4 * 512
+        out_channels = config['model']['dim_model']
+        self.linear=nn.Linear(in_channels, out_channels)
+    
+    def forward(self, x):
+        if x.dim() == 2:
+            x = x.unsqueeze(1) # add channel dim.
+        y = self.layers(x)
+        y = rearrange(y, 'b c t f -> b t (c f)')
+        return self.linear(y)
+
+    def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=1.)->list:
+        leng=[]
+        for l in input_lengths:
+            l = int(np.floor((l + 2*padding - dilation * (kernel_size-1) - 1)/stride + 1))
+            leng.append(l)
+        return leng
+    
+    def valid_lengths(self, input_lengths:list):
+        leng = self._valid_lengths(input_lengths, kernel_size=5, stride=2, padding=4, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=5, stride=1, padding=4, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=2, padding=4, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=4, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=4, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=4, dilation=1.)
+        return leng
+    
 class CTCLoss(nn.Module):
     def __init__(self) -> None:
         super(CTCLoss, self).__init__()
@@ -181,8 +248,9 @@ class ASRModel(nn.Module):
         self.cntf_channels=config['model']['cntf_channels']
         self.kernel_size=config['model']['kernel_size']
         self.cntf_kernel_size=config['model']['cntf_kernel_size']
-        self.cntf = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_model, kernel_size=self.cntf_kernel_size)
-        
+        #self.filter = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_model, kernel_size=self.cntf_kernel_size)
+        self.filter = ConvBasedFilter(config)
+
         self.bos = -1
         self.eos = -1
         self.model_type = config['model_type']
@@ -234,10 +302,11 @@ class ASRModel(nn.Module):
         #label_lengths -= 1 # remove tag
         label_lengths = [l -1 for l in label_lengths]
         
-        y = self.cntf(inputs)
+        y = self.filter(inputs)
 
         # compute valid input lengths because CNTF reduce the original lengths according to downsampling
-        valid_input_lengths = self.cntf.valid_lengths(input_lengths)
+        #valid_input_lengths = self.cntf.valid_lengths(input_lengths)
+        valid_input_lengths = self.filter.valid_lengths(input_lengths)
         
         z=self.dec_pe(self.dec_embed(labels_in))
         source_mask, target_mask, source_padding_mask, target_padding_mask = self.generate_masks(y, z, valid_input_lengths, label_lengths)
@@ -284,7 +353,8 @@ class ASRModel(nn.Module):
             #src_padding_mask = torch.ones(1, src.shape[1], dtype=bool)
             #src_padding_mask[:, :src_len]=False
             #y = self.enc_pe(self.prenet(src))
-            y = self.cntf(src)
+            #y = self.cntf(src)
+            y = self.filter(src)
             #memory = self.transformer.encoder(y, src_key_padding_mask=src_padding_mask)
             if self.model_type == 'conformer':
                 memory,_ = self.encoder(y, torch.tensor(valid_input_lengths).cuda())
