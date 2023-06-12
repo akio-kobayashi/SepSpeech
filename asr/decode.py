@@ -9,6 +9,7 @@ from speech_dataset import SpeechDataset
 from asr_tokenizer import ASRTokenizer
 from argparse import ArgumentParser
 import yaml
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
