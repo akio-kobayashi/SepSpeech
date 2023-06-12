@@ -37,10 +37,12 @@ class SpeakerNetwork(nn.Module):
         return y, z
 
 class SpeakerAdaptationLayer(nn.Module):
-    def __init__(self, adpt_type, channels=None) -> None:
+    def __init__(self, adpt_type='factor', channels=None) -> None:
         super(SpeakerAdaptationLayer, self).__init__()
         self.linear=None
-        if adpt_type == 'residual':
+        self.adpt_type=adpt_type
+        if adpt_type == 'residual' or adpt_type == 'concat':
+            assert channels is not None
             self.linear = nn.Linear(channels*2, channels)
 
     def forward(self, x:torch.Tensor, s:torch.Tensor) -> torch.Tensor:
@@ -48,10 +50,15 @@ class SpeakerAdaptationLayer(nn.Module):
             # (B, C, T) x (B, C)
             y = x * s.unsqueeze(-1)
             return y
-        else:
+        elif self.adpt_type == 'residual':
             s = s.unsqueeze(-1).repeat((1, 1, x.shape[-1]))
             y = self.linear(torch.cat((x, s), dim=-1))
             return x + y
+        elif self.adpt_type == 'concat':
+            s = s.unsqueeze(-1).repeat((1, 1, x.shape[-1]))
+            y = self.linear(torch.cat((x, s), dim=-1))
+            return y
+
 
 '''        
 class SpeakerAdaptationLayer(nn.Module):
