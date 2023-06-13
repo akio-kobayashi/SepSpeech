@@ -141,13 +141,14 @@ class PositionEncoding(nn.Module):
 
 class CausalConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1, **kwargs):
+        super().__init__()
         padding = (kernel_size-1) * dilation
         self.conv=nn.Conv2d(
             in_channels,
             out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            padding=padding,
+            padding=(padding,0),
             dilation=dilation,
             **kwargs
         )
@@ -156,13 +157,14 @@ class CausalConv2d(nn.Module):
         return self.conv(x)
     
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels:int, out_channels:int, kernel_size:int, stride:int, dropout:float) -> None
+    def __init__(self, in_channels:int, out_channels:int, kernel_size:int, stride:int, dropout:float) -> None:
+        super().__init__()
         self.layers = nn.Sequential(
-            nn.LayerNorm(in_channels),
+            LayerNorm(in_channels),
             nn.ReLU(),
-            CausalConv2d(in_channels, out_channels, kernel_size, stride=stride)
+            CausalConv2d(in_channels, out_channels, kernel_size, stride=stride),
             nn.Dropout(dropout),
-            nn.LayerNorm(out_channels),
+            LayerNorm(out_channels),
             nn.ReLU(),
             CausalConv2d(out_channels, out_channels, kernel_size, stride=1),
             nn.Dropout(dropout)
@@ -178,15 +180,18 @@ class ConvBasedFilter(nn.Module):
             ConvBlock(32, 256, 3, stride=2, dropout=0.1),
             ConvBlock(256, 512, 3, stride=1, dropout=0.1)
         )
-        in_channels = config['model']['dim_input'] // 4 * 512
+        in_channels = config['model']['dim_input'] // 8 * 512
         out_channels = config['model']['dim_model']
         self.linear=nn.Linear(in_channels, out_channels)
     
     def forward(self, x):
-        if x.dim() == 2:
+        if x.dim() == 3:
             x = x.unsqueeze(1) # add channel dim.
+        #print(x.shape)
         y = self.layers(x)
+        #print(y.shape)
         y = rearrange(y, 'b c t f -> b t (c f)')
+        #print(y.shape)
         return self.linear(y)
 
     def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=1.)->list:
@@ -199,10 +204,10 @@ class ConvBasedFilter(nn.Module):
     def valid_lengths(self, input_lengths:list):
         leng = self._valid_lengths(input_lengths, kernel_size=5, stride=2, padding=4, dilation=1.)
         leng = self._valid_lengths(leng, kernel_size=5, stride=1, padding=4, dilation=1.)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=2, padding=4, dilation=1.)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=4, dilation=1.)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=4, dilation=1.)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=4, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=2, padding=2, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
+        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
         return leng
     
 class CTCLoss(nn.Module):
