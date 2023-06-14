@@ -38,7 +38,7 @@ class LitSepSpeaker(pl.LightningModule):
             self.stft_loss = MultiResolutionSTFTLoss()
             self.stft_loss_weight = config['loss']['stft']['weight']
         if config['loss']['pesq']['use']:
-            self.pesq_loss = PesqlLoss(fator=1.)
+            self.pesq_loss = PesqLoss(fator=1.)
             self.pesq_loss_weight = config['loss']['pesq']['weight']
         if config['loss']['stoi_loss']['use']:
             self.stoi_loss = NegSTOILoss()
