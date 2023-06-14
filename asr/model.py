@@ -348,10 +348,10 @@ class ASRModel(nn.Module):
         mask = (torch.triu(torch.ones((seq_len, seq_len))) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
-
+        
     def greedy_decode(self, src:Tensor, input_lengths:int) -> list:
 
-        valid_input_lengths = self.cntf.valid_lengths(input_lengths)
+        valid_input_lengths = self.filter.valid_lengths(input_lengths) #= self.cntf.valid_lengths(input_lengths)
         
         assert self.bos != -1
         with torch.no_grad():

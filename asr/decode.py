@@ -30,7 +30,7 @@ def main(config:dict, checkpoint_path:str, output:str):
                                  tokenizer=tokenizer)
     test_loader = data.DataLoader(dataset=test_dataset,
                                   batch_size=1,
-                                  num_workers=2,
+                                  num_workers=1,
                                   pin_memory=True,
                                   shuffle=False, 
                                   collate_fn=lambda x: speech_dataset.data_processing(x))

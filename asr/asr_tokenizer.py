@@ -2,6 +2,7 @@ import transformers
 import tokenizers
 from tokenizers import SentencePieceBPETokenizer
 from typing import Tuple, List
+import re
 
 class ASRTokenizer():
     def __init__(self, path, max_length=256, ctc_decode=False):
@@ -23,11 +24,19 @@ class ASRTokenizer():
         self.tokenizer.mask_token = "<mask>"
 
         self.ctc_decode = ctc_decode
-    
+
+        self.punct = re.compile(r"⠲$")
+        self.space1 = re.compile(r"^\ ")
+        self.space2 = re.compile(r"\ $")
+        
     def text2token(self, text) -> List[int]:
-        text = self.tokenizer.bos_token + text + self.tokenizer.eos_token
+        text = re.sub(self.punct, '', text)
+        text = self.tokenizer.bos_token + ' ' + text + ' '+self.tokenizer.eos_token
         return self.tokenizer.encode(text)
 
+    def token2text_raw(self, token) -> str:
+        return self.tokenizer.decode(token)
+    
     def token2text(self, token) -> str:
         if self.ctc_decode:
             rmvd = []
@@ -50,4 +59,7 @@ class ASRTokenizer():
                     continue
                 rmvd.append(id)
             text = self.tokenizer.decode(rmvd)
+        text = re.sub(self.space1, '', text)
+        text = re.sub(self.space2, '', text)
+        
         return text

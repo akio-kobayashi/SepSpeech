@@ -59,6 +59,7 @@ def main(config:dict, args):
             max_lr=1.e-3
         )
         new_lr = lr_find_results.suggestion(skip_begin=20, skip_end=20)
+        print("initial learning rate: %.3f" % new_lr)
         model.hparams.lr = new_lr
 
     # start training

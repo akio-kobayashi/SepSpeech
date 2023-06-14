@@ -69,6 +69,7 @@ class SpeechDataset(torch.utils.data.Dataset):
         row = self.df.iloc[idx]
         
         source_path = row['source']
+        assert os.path.exists(source_path)
         source, _ = torchaudio.load(source_path, normalize=True)
         spec = self.wav2spec(source)
         if self.specaug:
@@ -83,11 +84,15 @@ class SpeechDataset(torch.utils.data.Dataset):
         
         pattern = re.compile('\s\s+')
         label_path = row['label']
+        label = None
+        assert os.path.exists(label_path) 
         with open(label_path, 'r') as  f:
             line = f.readline()
             line = re.sub(pattern, ' ', line.strip())
             label = self.tokenizer.text2token(line)
             label = torch.tensor(label, dtype=int)
+        assert label is not None
+        
         return melspec, label, row['key']
 
 def data_processing(data:Tuple[Tensor, list, str]) -> Tuple[Tensor, Tensor, list, list, list]:
