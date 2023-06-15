@@ -4,8 +4,8 @@ bos: '<s>'
 # dataset
 dataset:
   process:
-    batch_size: 8
-    num_workers: 2
+    batch_size: 16
+    num_workers: 1
   segment:
     segment: 20
     sample_rate: 16000
@@ -14,16 +14,17 @@ dataset:
   valid:  
     csv_path: '/export/20230515/valid_braille.csv'
   test:
-    csv_path: '/export/20230515/valid_braille.csv' #'/export/20230515/test_braille.csv'
+    csv_path: 'temp.csv' #'/export/20230515/valid_braille.csv' #'/export/20230515/test_braille.csv'
   tokenizer: '/export/20230515/braille_tokenizer/vocab.json'
   max_length: 1000
 analysis:
   sample_rate: 16000
-  nfft: 400
+  nfft: 512
   win_length: 400
   hop_length: 160
   n_mels: 80
   global_mean_std: '/export/20230515/global_mean_std.npz'
+  sort_by_len: true
 augment:
   specaug: false
   time_mask: 80
@@ -32,15 +33,15 @@ augment:
 trainer:
   accelerator: 'auto'
   accumulate_grad_batches: 5
-  max_epochs: 200
+  max_epochs: 1000
   precision: '16-mixed'
-  profiler: 'simple'
+  profiler: #'simple'
   gradient_clip_val: 5.
 optimizer:
-  lr: 4.e-5
+  lr: 1.e-5
 scheduler:
   max_lr: 1.e-4
-  epochs: 200
+  epochs: 1000
   steps_per_epoch: 1000
 logger:
   save_dir: './'
@@ -58,11 +59,12 @@ model:
   dim_output: 71 # number of alphabets
   num_heads: 8
   dim_feedforward: 1024
-  num_encoder_layers: 16
-  num_decoder_layers: 16 #8
+  num_encoder_layers: 6 #16
+  num_decoder_layers: 6 #16 #8
   kernel_size: 31 #3 #31
   cntf_channels: 104
   cntf_kernel_size: 7
+  ce_weight: 0.0
 decode:
   decode_max_len: 256
   
