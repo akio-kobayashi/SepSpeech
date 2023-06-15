@@ -67,4 +67,18 @@ model:
   ce_weight: 0.0
 decode:
   decode_max_len: 256
-  
+transducer:
+  input_dim: 80 # input dim to encoder network
+  time_reduction_stride: 4
+  encoding_dim: 256 # output dim of joint/prediction networks
+  conformer_input_dim: 256
+  conformer_ffn_dim: 1024
+  conformer_num_layers: 6
+  conformer_num_heads: 8 
+  conformer_depthwise_conv_kernel_size: 31
+  conformer_dropout: .1
+  num_symbols: 71
+  symbol_embedding_dim: 256
+  num_lstm_layers: 1
+  lstm_hidden_dim: 256
+  lstm_dropout: .1
