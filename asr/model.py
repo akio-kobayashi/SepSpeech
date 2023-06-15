@@ -213,7 +213,7 @@ class ConvBasedFilter(nn.Module):
 class CTCLoss(nn.Module):
     def __init__(self) -> None:
         super(CTCLoss, self).__init__()
-        self.ctc=nn.CTCLoss()
+        self.ctc=nn.CTCLoss(zero_infinity=True)
 
     def forward(self, outputs:Tensor, labels:Tensor, output_lengths:list, label_lengths:list) -> Tensor:
         outputs = rearrange(outputs, 'b t c -> t b c')
@@ -287,8 +287,8 @@ class ASRModel(nn.Module):
                                              self.num_decoder_layers,
                                              nn.LayerNorm(self.dim_model))
         self.linear = nn.Linear(self.dim_model, self.dim_output)
-        
-        self.ce_loss = CELoss()
+        self.ctc_linear = nn.Linear(self.dim_model, self.dim_output)
+        self.ctc_loss = CTCLoss()
 
         self.decode_max_len = config['decode']['decode_max_len']
         
@@ -308,7 +308,6 @@ class ASRModel(nn.Module):
         label_lengths = [l -1 for l in label_lengths]
         
         y = self.filter(inputs)
-
         # compute valid input lengths because CNTF reduce the original lengths according to downsampling
         #valid_input_lengths = self.cntf.valid_lengths(input_lengths)
         valid_input_lengths = self.filter.valid_lengths(input_lengths)
@@ -326,8 +325,11 @@ class ASRModel(nn.Module):
                          memory_key_padding_mask=source_padding_mask)
 
         y = self.linear(y)
+        y_ctc = self.ctc_linear(memory)
 
-        return y
+        _ctc_loss = self.ctc_loss(y_ctc.to(torch.float), labels_out, label_lengths, label_lengths)
+        
+        return y, _ctc_loss
 
     def generate_masks(self, src:Tensor, tgt:Tensor, src_len:list, tgt_len:list) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         B=src.shape[0]

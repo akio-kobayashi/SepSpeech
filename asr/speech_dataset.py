@@ -23,6 +23,8 @@ class SpeechDataset(torch.utils.data.Dataset):
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(csv_path)
+        if config['analysis']['sort_by_len']:
+            self.df = self.df.sort_values('length')
         self.segment = segment if segment > 0 else None
         self.sample_rate = config['analysis']['sample_rate']
         if self.segment is not None:
@@ -91,7 +93,7 @@ class SpeechDataset(torch.utils.data.Dataset):
             line = re.sub(pattern, ' ', line.strip())
             label = self.tokenizer.text2token(line)
             label = torch.tensor(label, dtype=int)
-        assert label is not None
+        assert label is not None and len(label) > 0
         
         return melspec, label, row['key']
 

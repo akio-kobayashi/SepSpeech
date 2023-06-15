@@ -26,11 +26,12 @@ def main(config:dict, args):
     train_dataset = SpeechDataset(config['dataset']['train']['csv_path'], 
                                   config, 
                                   config['dataset']['segment']['segment'],
-                                  tokenizer=None) 
+                                  tokenizer=None)
+    shuffle = True if config['analysis']['sort_by_len'] is False else True
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
-                                   shuffle=True, 
+                                   shuffle=shuffle, 
                                    collate_fn=lambda x: speech_dataset.data_processing(x))
     valid_dataset = SpeechDataset(config['dataset']['valid']['csv_path'],
                                   config,
@@ -59,7 +60,7 @@ def main(config:dict, args):
             max_lr=1.e-3
         )
         new_lr = lr_find_results.suggestion(skip_begin=20, skip_end=20)
-        print("initial learning rate: %.3f" % new_lr)
+        print("initial learning rate: %.4e" % new_lr)
         model.hparams.lr = new_lr
 
     # start training
