@@ -31,7 +31,7 @@ class Encoder(nn.Module):
             1,
             in_channels,    # 256
             kernel_size,    # 20
-            kernel_size//2,      # 10
+            kernel_size//2, # 10
             kernel_size//2, # padding
             1
         )

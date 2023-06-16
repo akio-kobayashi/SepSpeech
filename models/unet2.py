@@ -4,12 +4,13 @@
 import pytorch_lightning as pt
 from typing import Tuple
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn as nn
 from torch import Tensor
 import math
 from einops import rearrange
-
+       
 class TFEncoder(nn.Module):
     def __init__(self, dim, n_layers=5, n_heads=8):
         super(TFEncoder, self).__init__()

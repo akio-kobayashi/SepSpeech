@@ -38,7 +38,8 @@ class LitSepSpeaker(pl.LightningModule):
             self.stft_loss = MultiResolutionSTFTLoss()
             self.stft_loss_weight = config['loss']['stft']['weight']
         if config['loss']['pesq']['use']:
-            self.pesq_loss = PesqLoss(fator=1.)
+            self.pesq_loss = PesqLoss(factor=1.,
+                                      sample_rate=16000)
             self.pesq_loss_weight = config['loss']['pesq']['weight']
         if config['loss']['stoi_loss']['use']:
             self.stoi_loss = NegSTOILoss()
@@ -72,7 +73,8 @@ class LitSepSpeaker(pl.LightningModule):
             _loss += self.stft_loss_weight * _stft_loss
 
         if self.pesq_loss:
-            _pesq_loss = self.pesq(target, estimate)
+            with torch.cuda.amp.autocast('cuda', torch.float32):
+                _pesq_loss = self.pesq(target, estimate)
             if valid:
                 d['valid_pesq_loss'] = _pesq_loss
             else:
