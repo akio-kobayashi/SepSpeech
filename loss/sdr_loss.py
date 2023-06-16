@@ -35,3 +35,4 @@ class NegativeSISDR(_Loss):
         losses = losses.mean() if self.reduction == "mean" else losses
 
         return -losses
+    

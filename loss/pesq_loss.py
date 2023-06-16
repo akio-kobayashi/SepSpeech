@@ -12,8 +12,8 @@ from torch import Tensor
 from torchaudio.functional import lfilter
 from torchaudio.transforms import Spectrogram, Resample
 
-from typeguard import typechecked
-from torchtyping import TensorType
+#from typeguard import typechecked
+#from torchtyping import TensorType
 from typing import Tuple
 
 from .bark import BarkScale
@@ -113,7 +113,7 @@ class PesqLoss(torch.nn.Module):
             requires_grad=False,
         )
 
-    @typechecked
+    #@typechecked
     def align_level(
         self, signal
     ) -> Tensor:
@@ -129,7 +129,6 @@ class PesqLoss(torch.nn.Module):
         TensorType["batch", "sample"]
             Tensor containing the scaled time signal
         """
-
         filtered_signal = lfilter(
             signal, self.power_filter[1], self.power_filter[0], clamp=False
         )
@@ -146,7 +145,7 @@ class PesqLoss(torch.nn.Module):
 
         return signal
 
-    @typechecked
+    #@typechecked
     def preemphasize(
         self, signal
     ) -> Tensor:
@@ -174,7 +173,7 @@ class PesqLoss(torch.nn.Module):
 
         return signal
 
-    @typechecked
+    #@typechecked
     def raw(
         self, ref: Tensor, deg: Tensor
     ) -> Tuple[Tensor, Tensor]:
@@ -190,7 +189,8 @@ class PesqLoss(torch.nn.Module):
 
         deg, ref = self.resampler(deg), self.resampler(ref)
 
-        ref, deg = self.align_level(ref), self.align_level(deg)
+        ref = self.align_level(ref)
+        deg = self.align_level(deg)
         ref, deg = self.preemphasize(ref), self.preemphasize(deg)
 
         # do weird alignments with reference implementation
@@ -273,7 +273,7 @@ class PesqLoss(torch.nn.Module):
 
         return d_symm, d_asymm
 
-    @typechecked
+    #@typechecked
     def mos(
         self, ref: Tensor, deg: Tensor
     ) -> Tensor:
@@ -302,7 +302,7 @@ class PesqLoss(torch.nn.Module):
 
         return mos
 
-    @typechecked
+    #@typechecked
     def forward(
         self, ref: Tensor, deg: Tensor
     ) -> Tensor:
@@ -328,9 +328,11 @@ class PesqLoss(torch.nn.Module):
         return self.factor * (0.1 * d_symm + 0.0309 * d_asymm)
 
 if __name__ == "__main__":
-    _pesq = PesqLoss(factor=1.)
-    estimate = torch.randn(1, 100000)
-    target = torch.randn(1, 100000)
-    value = _pesq(target, estimate)
+    scaler=torch.cuda.amp.GradScaler()
+    _pesq = PesqLoss(factor=1.).cuda()
+    estimate = torch.randn(1, 100000).cuda()
+    target = torch.randn(1, 100000).cuda()
+    with torch.amp.autocast('cuda', dtype=torch.float32):
+        value = _pesq(target.float(), estimate.float())
     print(value.cpu().detach().numpy())
     
