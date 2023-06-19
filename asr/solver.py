@@ -12,6 +12,7 @@ class LitASR(pl.LightningModule):
         self.config = config
 
         self.model = ASRTransducer(config)
+        #self.model = ASRModel(config)
         #self.ce_loss = CELoss()
         #self.ctc_loss = CTCLoss()
         self.lr = config['optimizer']['lr']
@@ -24,8 +25,8 @@ class LitASR(pl.LightningModule):
                 input_lengths:list, label_lengths:list) -> Tensor:
         _loss = self.model(inputs, labels, input_lengths, label_lengths)
         return _loss
-        #y, y_ctc = self.model(inputs, labels, input_lengths, label_lengths)
-        #return y, y_ctc
+        #y, _ctc = self.model(inputs, labels, input_lengths, label_lengths)
+        #return y, _ctc
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
         inputs, labels, input_lengths, label_lengths, _ = batch
@@ -55,6 +56,11 @@ class LitASR(pl.LightningModule):
         _loss = self.forward(inputs, labels, input_lengths, label_lengths)
         self.log_dict({'valid_loss': _loss})
 
+        #outputs, _ = self.model.model.transcribe(inputs, torch.tensor(input_lengths).cuda())
+        #print(outputs.shape)
+        
+        outputs = outputs.cpu().detach().numpy()
+        
         return _loss
 
     def configure_optimizers(self):
@@ -71,6 +77,6 @@ class LitASR(pl.LightningModule):
         #return optimizer
 
     def decode(self, inputs:Tensor, input_lengths:list) -> list:
-        #decoded = self.model.greedy_decode(inputs, input_lengths)
-        #return decoded
         decoded = self.model.decode(inputs, input_lengths)
+        return decoded
+    

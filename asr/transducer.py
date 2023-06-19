@@ -5,13 +5,15 @@ import torchaudio
 import torchaudio.transforms as T
 import torchaudio.functional as F
 from torchaudio.transforms import RNNTLoss
-from torchaudio.prototype.models import rnnt_conformer_model
+import torchaudio.prototype.models as M
+from torchaudio.prototype.models import conformer_rnnt_model
 from einops import rearrange
+import numpy as np
 
 class ASRTransducer(nn.Module):
     def __init__(self, config:dict) -> None:
         super().__init__()
-        self.model = rnnt_conformer_model(
+        self.model = conformer_rnnt_model(
             input_dim=config['transducer']['input_dim'], # dimension of frames to the transcription network
             encoding_dim=config['transducer']['encoding_dim'], # dimension of features to joint network
             time_reduction_stride = config['transducer']['time_reduction_stride'],
@@ -20,9 +22,9 @@ class ASRTransducer(nn.Module):
             conformer_num_layers=config['transducer']['conformer_num_layers'],
             conformer_num_heads=config['transducer']['conformer_num_heads'],
             conformer_depthwise_conv_kernel_size=config['transducer']['conformer_depthwise_conv_kernel_size'],
-            conformer_dropout=config['conformer_dropout'],
+            conformer_dropout=config['transducer']['conformer_dropout'],
             num_symbols=config['transducer']['num_symbols'],
-            sysmbol_embedding_dim=config['transducer']['symbol_embedding_dim'],
+            symbol_embedding_dim=config['transducer']['symbol_embedding_dim'],
             num_lstm_layers=config['transducer']['num_lstm_layers'],
             lstm_hidden_dim=config['transducer']['lstm_hidden_dim'],
             lstm_layer_norm=False,
@@ -31,24 +33,65 @@ class ASRTransducer(nn.Module):
             joiner_activation="relu",
         )
     
-    def forward(self, sources:Tensor, source_lengths:list, targets:Tensor, target_lengths:list):
-        source_lengths = torch.tensor(source_lengths)
-        target_lengths = torch.tensor(target_lengths)
-        # _joint_output : (B, S, T, F)
+    def forward(self, sources:Tensor, targets:Tensor, source_lengths:list, target_lengths:list):
+        source_lengths = torch.tensor(source_lengths, dtype=torch.int32)
+        target_lengths = torch.tensor(target_lengths, dtype=torch.int32)
+        # targets (B, U) -> (B, U+1)
+        padded_targets = torch.cat([torch.zeros(len(targets), 1, dtype=torch.int32).cuda(), targets], dim=-1)
+        padded_target_lengths = torch.tensor([ l+1 for l in target_lengths ], dtype=torch.int32)
+        # _joint_output : (B, T, U+1, C)
         # _output_source_lengths : (B,)
-        # _output_target_lengths : (B, )
+        # _output_target_lengths : (B,)
         # _output_states : list[list[Tensor]] 
         _joint_output, _output_source_lengths, _output_target_lengths, _ = self.model(
-            sources=sources,
-            source_lengths=source_lengths,
-            targets=targets,
-            target_lengths=target_lengths
+            sources=sources.cuda(),
+            source_lengths=source_lengths.cuda(),
+            targets=padded_targets.cuda(),
+            target_lengths=padded_target_lengths.cuda()
         )
-        _loss = F.rnnt_loss(_joint_output, targets, _output_source_lengths, _output_target_lengths, blank=0)
+        #print(_joint_output.shape)
+        _loss = F.rnnt_loss(_joint_output.cuda(),
+                            targets.cuda(),
+                            _output_source_lengths.cuda(),
+                            target_lengths.cuda(),
+                            blank=0)
 
         return _loss
     
-    def decode(self, sources:Tensor, source_lengths:list):
-        source_lengths = torch.tensor(source_lengths)
-        outputs, output_lengths = self.model.transcribe(sources, source_lengths)
-        return outputs, output_lengths
+    def greedy_decode(self, sources:Tensor, source_lengths:list):
+        assert len(source_lengths) == 1
+        leng = source_lengths[0]
+        
+        source_lengths = torch.tensor(source_lengths, dtype=torch.int32)
+        source_encodings, source_lengths = self.model.transcribe(sources.cuda(),
+                                                        source_lengths.cuda())
+        targets=torch.tensor([[0]])
+        for i in leng:
+            target_encodings, target_lengths, _ = self.model.predict(
+                targets.cuda(),
+                target_lengths(torch.tensor([[i+1]])).cuda()
+            )
+            outputs, _ = self.model.join(source_encodings,
+                                         source_lengths,
+                                         target_encodings,
+                                         target_lengths
+                                         )
+            outputs = torch.argmax(F.log_softmax(outputs, dim=1), dim=-1)
+            targets.append(targets, outputs.unsqueeze(0))
+            
+        return outputs
+
+if __name__=='__main__':
+    import yaml
+    
+    path = './config.yaml'
+    with open(path, 'r') as yf:
+        config = yaml.safe_load(yf)
+    model = ASRTransducer(config)
+    inputs = torch.randn(1, 1000, 80, dtype=torch.float32)
+    input_lengths = torch.tensor([1000,], dtype=torch.int32)
+    print(inputs.shape)
+    print(input_lengths.shape)
+    outputs,_ = model.model.transcribe(inputs, input_lengths)
+    print (outputs.shape)
+    

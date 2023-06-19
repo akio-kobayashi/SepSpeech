@@ -49,7 +49,10 @@ class ASRTokenizer():
                     continue
                 if id == self.tokenizer.blank_token_id:
                     continue
+                if id < 8:
+                    continue
                 rmvd.append(id)
+                prv_id = id
 
             text = self.tokenizer.decode(rmvd)
         else:

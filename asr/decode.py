@@ -20,9 +20,9 @@ def main(config:dict, checkpoint_path:str, output:str):
 
     assert checkpoint_path is not None
 
-    tokenizer = ASRTokenizer(config['dataset']['tokenizer'], config['dataset']['max_length'])
+    tokenizer = ASRTokenizer(config['dataset']['tokenizer'], config['dataset']['max_length'], ctc_decode=True)
     model = LitASR.load_from_checkpoint(checkpoint_path, config=config, tokenizer=tokenizer)
-    model.model.set_special_tokens(tokenizer.text2token(config['bos'])[0], tokenizer.text2token(config['eos'])[0])
+    #model.model.set_special_tokens(tokenizer.text2token(config['bos'])[0], tokenizer.text2token(config['eos'])[0])
 
     test_dataset = SpeechDataset(config['dataset']['test']['csv_path'],
                                  config,
@@ -35,15 +35,12 @@ def main(config:dict, checkpoint_path:str, output:str):
                                   shuffle=False, 
                                   collate_fn=lambda x: speech_dataset.data_processing(x))
     model.cuda().eval()
-    #npz = np.load(config['analysis']['global_mean_std'])
-    #mean, std = torch.from_numpy(npz['mean']), torch.from_numpy(npz['std'])
     
     with open(output, 'w') as f:
         for batch_idx, batch in enumerate(test_loader):
             inputs, _, input_lengths, _, keys = batch
-            #inputs = (inputs - mean)/std
-            output = model.decode(inputs.cuda(), input_lengths)
-
+            output, output_lengths = model.decode(inputs.cuda(), input_lengths)
+            output = output.squeeze().cpu().detach().numpy().tolist()
             output = tokenizer.token2text(output) # w/o special tokens
             # split text for CER computation
             output = ' '.join(list(output))

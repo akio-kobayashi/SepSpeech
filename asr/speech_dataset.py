@@ -82,8 +82,7 @@ class SpeechDataset(torch.utils.data.Dataset):
 
         melspec = torch.log(self.spec2mel(spec)+self.eps) # (1, n_mels, time)
         melspec = torch.t(melspec.squeeze()) # (time, n_mels)
-        melspac = (melspec - self.mean)/self.std
-        
+        melspec = (melspec - self.mean)/self.std
         pattern = re.compile('\s\s+')
         label_path = row['label']
         label = None
@@ -92,7 +91,8 @@ class SpeechDataset(torch.utils.data.Dataset):
             line = f.readline()
             line = re.sub(pattern, ' ', line.strip())
             label = self.tokenizer.text2token(line)
-            label = torch.tensor(label, dtype=int)
+            label = torch.tensor(label, dtype=torch.int32)
+            #label = torch.tensor(label)
         assert label is not None and len(label) > 0
         
         return melspec, label, row['key']

@@ -148,7 +148,7 @@ class CausalConv2d(nn.Module):
             out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            padding=(padding,0),
+            padding=(padding,kernel_size//2),
             dilation=dilation,
             **kwargs
         )
@@ -177,10 +177,10 @@ class ConvBasedFilter(nn.Module):
         super().__init__()
         self.layers = nn.Sequential(
             ConvBlock(1, 32, 5, stride=2, dropout=0.1),
-            ConvBlock(32, 256, 3, stride=2, dropout=0.1),
-            ConvBlock(256, 512, 3, stride=1, dropout=0.1)
+            ConvBlock(32, 256, 3, stride=1, dropout=0.1),
+            #ConvBlock(256, 512, 3, stride=1, dropout=0.1)
         )
-        in_channels = config['model']['dim_input'] // 8 * 512
+        in_channels = config['model']['dim_input'] // 2 * 256
         out_channels = config['model']['dim_model']
         self.linear=nn.Linear(in_channels, out_channels)
     
@@ -204,10 +204,10 @@ class ConvBasedFilter(nn.Module):
     def valid_lengths(self, input_lengths:list):
         leng = self._valid_lengths(input_lengths, kernel_size=5, stride=2, padding=4, dilation=1.)
         leng = self._valid_lengths(leng, kernel_size=5, stride=1, padding=4, dilation=1.)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=2, padding=2, dilation=1.)
         leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
         leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
+        #leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
+        #leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=2, dilation=1.)
         return leng
     
 class CTCLoss(nn.Module):
@@ -253,7 +253,9 @@ class ASRModel(nn.Module):
         self.cntf_channels=config['model']['cntf_channels']
         self.kernel_size=config['model']['kernel_size']
         self.cntf_kernel_size=config['model']['cntf_kernel_size']
-        #self.filter = CNTF(dim=self.dim_input, depth=2, cntf_channels=config['model']['cntf_channels'], output_dim=self.dim_model, kernel_size=self.cntf_kernel_size)
+        #self.filter = CNTF(dim=self.dim_input,
+        #depth=2, cntf_channels=config['model']['cntf_channels'],
+        #output_dim=self.dim_model, kernel_size=self.cntf_kernel_size)
         self.filter = ConvBasedFilter(config)
 
         self.bos = -1
@@ -325,7 +327,7 @@ class ASRModel(nn.Module):
                          memory_key_padding_mask=source_padding_mask)
 
         y = self.linear(y)
-        y_ctc = self.ctc_linear(memory)
+        y_ctc = F.log_softmax(self.ctc_linear(memory), dim=-1)
 
         _ctc_loss = self.ctc_loss(y_ctc.to(torch.float), labels_out, label_lengths, label_lengths)
         
