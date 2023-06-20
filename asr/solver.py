@@ -58,8 +58,7 @@ class LitASR(pl.LightningModule):
 
         #outputs, _ = self.model.model.transcribe(inputs, torch.tensor(input_lengths).cuda())
         #print(outputs.shape)
-        
-        outputs = outputs.cpu().detach().numpy()
+        #outputs = outputs.cpu().detach().numpy()
         
         return _loss
 
@@ -77,6 +76,6 @@ class LitASR(pl.LightningModule):
         #return optimizer
 
     def decode(self, inputs:Tensor, input_lengths:list) -> list:
-        decoded = self.model.decode(inputs, input_lengths)
+        decoded = self.model.greedy_decode(inputs, input_lengths)
         return decoded
     

@@ -66,18 +66,23 @@ class ASRTransducer(nn.Module):
         source_encodings, source_lengths = self.model.transcribe(sources.cuda(),
                                                         source_lengths.cuda())
         targets=torch.tensor([[0]])
-        for i in leng:
-            target_encodings, target_lengths, _ = self.model.predict(
+        state=None
+        for i in range(leng):
+            target_encodings, target_lengths, state = self.model.predict(
                 targets.cuda(),
-                target_lengths(torch.tensor([[i+1]])).cuda()
+                torch.tensor([[i+1]]).cuda(),
+                state
             )
-            outputs, _ = self.model.join(source_encodings,
-                                         source_lengths,
-                                         target_encodings,
-                                         target_lengths
-                                         )
-            outputs = torch.argmax(F.log_softmax(outputs, dim=1), dim=-1)
-            targets.append(targets, outputs.unsqueeze(0))
+            print(source_encodings.shape)
+            outputs, output_source_lengths, output_target_lengths = self.model.join(source_encodings,
+                                                                                    torch.tensor([[i+1]]).cuda(),
+                                                                                    target_encodings,
+                                                                                    target_lengths
+                                                                                    )
+            outputs = torch.argmax(torch.nn.functional.log_softmax(outputs, dim=1), dim=-1)
+            print(outputs.shape)
+            print(targets.shape)
+            targets = torch.cat([targets.cuda(), outputs], dim=-1)
             
         return outputs
 

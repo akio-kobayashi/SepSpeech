@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 '''
  PyTorch Lightning用 将来変更する予定
 '''
-def main(config:dict, checkpoint_path:str, output:str):
+def main(config:dict, checkpoint_path:str, tokenizer_path, output:str):
 
     assert checkpoint_path is not None
 
@@ -50,6 +50,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, required=True)
+    #parser.add_argument('--tokenizer_path', type=str, required=True)
     parser.add_argument('--output', type=str, required=True)
     args=parser.parse_args()
 
@@ -57,4 +58,4 @@ if __name__ == '__main__':
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
 
-    main(config, args.checkpoint, args.output)
+    main(config['config'], args.checkpoint, args.output)
