@@ -1,7 +1,7 @@
 #!/bin/sh
 
 config=radio.yaml
-checkpoint=lightning_logs/version_1/checkpoints/checkpoint_epoch\=290-step\=701310-valid_loss\=0.065.ckpt
+checkpoint=lightning_logs/version_1/checkpoints/checkpoint_epoch\=144-step\=174725-valid_loss\=0.078.ckpt
 input_csv=audio/csv/test.csv
 output_csv=/media/akio/hdd1/20230515/test/csv/out.csv
 output_dir=/media/akio/hdd1/20230515/test/estimate
