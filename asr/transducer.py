@@ -65,26 +65,32 @@ class ASRTransducer(nn.Module):
         source_lengths = torch.tensor(source_lengths, dtype=torch.int32)
         source_encodings, source_lengths = self.model.transcribe(sources.cuda(),
                                                         source_lengths.cuda())
-        targets=torch.tensor([[0]])
-        state=None
+        #print(source_encodings.shape)
+        state = None
+        target=torch.tensor([[0]]) # first zero
+        targets = []
+        target_encodings, target_lengths, state = self.model.predict(
+            target.cuda(),
+            torch.tensor([[1]]).cuda(),
+            state
+        )
         for i in range(leng):
-            target_encodings, target_lengths, state = self.model.predict(
-                targets.cuda(),
-                torch.tensor([[i+1]]).cuda(),
-                state
-            )
-            print(source_encodings.shape)
-            outputs, output_source_lengths, output_target_lengths = self.model.join(source_encodings,
-                                                                                    torch.tensor([[i+1]]).cuda(),
+            outputs, output_source_lengths, output_target_lengths = self.model.join(source_encodings[:, i, :].unsqueeze(0),
+                                                                                    torch.tensor([[1]]).cuda(),
                                                                                     target_encodings,
                                                                                     target_lengths
                                                                                     )
-            outputs = torch.argmax(torch.nn.functional.log_softmax(outputs, dim=1), dim=-1)
-            print(outputs.shape)
-            print(targets.shape)
-            targets = torch.cat([targets.cuda(), outputs], dim=-1)
-            
-        return outputs
+            pred = torch.reshape(torch.argmax(outputs, dim=-1), (1,1))
+            if pred != 0:
+                targets.append(pred.cpu().detach().numpy()[0,0])
+            target = pred
+            target_encodings, target_lengths, state = self.model.predict(
+                target.cuda(),
+                torch.tensor([[1]]).cuda(),
+                state
+            )
+
+        return targets
 
 if __name__=='__main__':
     import yaml

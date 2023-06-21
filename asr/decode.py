@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 '''
  PyTorch Lightning用 将来変更する予定
 '''
-def main(config:dict, checkpoint_path:str, tokenizer_path, output:str):
+def main(config:dict, checkpoint_path:str, output:str):
 
     assert checkpoint_path is not None
 
@@ -38,9 +38,8 @@ def main(config:dict, checkpoint_path:str, tokenizer_path, output:str):
     
     with open(output, 'w') as f:
         for batch_idx, batch in enumerate(test_loader):
-            inputs, _, input_lengths, _, keys = batch
-            output, output_lengths = model.decode(inputs.cuda(), input_lengths)
-            output = output.squeeze().cpu().detach().numpy().tolist()
+            inputs, labels, input_lengths, _, keys = batch
+            output = model.decode(inputs.cuda(), input_lengths)
             output = tokenizer.token2text(output) # w/o special tokens
             # split text for CER computation
             output = ' '.join(list(output))
@@ -58,4 +57,4 @@ if __name__ == '__main__':
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
 
-    main(config['config'], args.checkpoint, args.output)
+    main(config, args.checkpoint, args.output)
