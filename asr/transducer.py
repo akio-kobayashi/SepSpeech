@@ -78,7 +78,7 @@ class ASRTransducer(nn.Module):
             outputs, output_source_lengths, output_target_lengths = self.model.join(source_encodings[:, i, :].unsqueeze(0),
                                                                                     torch.tensor([[1]]).cuda(),
                                                                                     target_encodings,
-                                                                                    target_lengths
+                                                                                    torch.tensor([[1]]).cuda()
                                                                                     )
             pred = torch.reshape(torch.argmax(outputs, dim=-1), (1,1))
             if pred != 0:
