@@ -92,6 +92,7 @@ class ASRTransducer(nn.Module):
 
         return targets
 
+           
 if __name__=='__main__':
     import yaml
     
