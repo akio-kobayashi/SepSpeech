@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 from typing import Tuple
 from model import ASRModel, CELoss, CTCLoss
 from transducer import ASRTransducer
+from torchaudio.modles import RNNTBeamSearch
 
 class LitASR(pl.LightningModule):
     def __init__(self, config:dict) -> None:
@@ -19,6 +20,8 @@ class LitASR(pl.LightningModule):
 
         #self.ce_weight = config['model']['ce_weight']
         
+        self.decoder = RNNTBeamSearch(self.model, blank=0)
+
         self.save_hyperparameters()
 
     def forward(self, inputs:Tensor, labels:Tensor,
@@ -76,6 +79,7 @@ class LitASR(pl.LightningModule):
         #return optimizer
 
     def decode(self, inputs:Tensor, input_lengths:list) -> list:
-        decoded = self.model.greedy_decode(inputs, input_lengths)
-        return decoded
+        #decoded = self.model.greedy_decode(inputs, input_lengths)
+        hypotheses, state = self.decoder.infer(inputs, input_lengths, 10, state=None, hypothesis=None)
+        return hypotheses
     
