@@ -8,6 +8,7 @@ import pandas as pd
 from typing import Tuple
 from torch import Tensor
 import torchaudio
+from augment.opus_augment import OpusAugment
 
 '''
     音声強調用データの抽出
@@ -87,12 +88,16 @@ class SpeechDataset(torch.utils.data.Dataset):
 
 # On-the-fly ミキシング
 class SpeechDatasetOTFMix(SpeechDataset):
-    def __init__(self, csv_path:str, noise_csv_path:str, enroll_path:str, 
-                 sample_rate=16000, segment=None, min_snr=0, max_snr=20) -> None:
-        super().__init__(csv_path, enroll_path, sample_rate=16000, segment=None)
+    def __init__(self, csv_path:str, noise_csv_path:str, enroll_csv_path:str, 
+                 mixing:dict, augment:dict,
+                 sample_rate=16000, segment=None) -> None:
+        super().__init__(csv_path, enroll_csv_path, sample_rate=16000, segment=None)
         self.noise_df = pd.read_csv(noise_csv_path)
-        self.min_snr=min_snr
-        self.max_snr=max_snr
+        self.min_snr=mixing['min_snr']
+        self.max_snr=mixing['max_snr']
+        self.opus = None:
+        if augment['frame_duration'] > 0:
+            self.opus = OpusAugment(augment)
 
     def rms(self, wave):
         return torch.sqrt(torch.mean(torch.square(wave)))
@@ -143,6 +148,9 @@ class SpeechDatasetOTFMix(SpeechDataset):
 
         snr = np.random.rand() * (self.max_snr-self.min_snr) + self.min_snr
         mixture = self.mix(source, noise, snr)
+
+        if self.opus:
+            mixture = self.opus(mixture)
 
         return mixture, source, enroll, source_speaker
 

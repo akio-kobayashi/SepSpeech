@@ -5,7 +5,7 @@ import torch.utils.data as data
 from lite.solver import LitSepSpeaker
 import torch.utils.data as dat
 import conventional
-from conventional.speech_dataset import SpeechDataset
+from conventional.speech_dataset import SpeechDatasetOTFMix
 from argparse import ArgumentParser
 import yaml
 import warnings
@@ -21,15 +21,21 @@ def main(config:dict, checkpoint_path=None):
     else:
         model = LitSepSpeaker(config)
 
-    train_dataset = SpeechDataset(**config['dataset']['train'], 
-                                  **config['dataset']['segment'])
+    train_dataset = SpeechDatasetOTFMix(**config['dataset']['train'], 
+                                        config['augment']['mixing'],
+                                        config['augment']['opus'],
+                                        config['dataset']['segment']['sample_rate'],
+                                        config['dataset']['segment']['segment'])
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
                                    shuffle=True, 
                                    collate_fn=lambda x: conventional.speech_dataset.data_processing(x))
-    valid_dataset = SpeechDataset(**config['dataset']['valid'],
-                                  **config['dataset']['segment'])
+    valid_dataset = SpeechDatasetOTFMix(config['dataset']['valid'],
+                                        config['augment']['mixing'],
+                                        config['augment']['opus'],
+                                        config['dataset']['segment']['sample_rate'],
+                                        config['dataset']['segment']['segment'])
     valid_loader = data.DataLoader(dataset=valid_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,

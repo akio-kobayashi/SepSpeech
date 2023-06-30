@@ -4,24 +4,34 @@ dataset:
     batch_size: 8
     num_workers: 2
   segment:
-    segment: 10
-    enroll_segment: 20
+    segment: none
+    enroll_segment: none
     sample_rate: 16000
   train:
     csv_path: 'audio/csv/train_3p.csv'
-    enroll_path: 'audio/csv/enroll_3p.csv'
-    noise_path: 'audio/csv/noise_train.csv' # on-the-fly mixing
+    enroll_csv_path: 'audio/csv/enroll_3p.csv'
+    noise_csv_path: 'audio/csv/noise_train.csv' # on-the-fly mixing
   valid:  
     csv_path: 'audio/csv/valid_3p.csv'
-    enroll_path: 'audio/csv/enroll_3p.csv'
-    noise_path: 'audio/csv/noise_valid.csv'
+    enroll_cav_path: 'audio/csv/enroll_3p.csv'
+    noise_csv_path: 'audio/csv/noise_valid.csv'
   test:
     csv_path: 
     enroll_path: 
     noise_path:
+augment:
   # on-the-fly mixing
-  min_snr: 0
-  max_snr: 20
+  mixing:
+    min_snr: 0
+    max_snr: 20
+  opus:
+    sample_rate: 16000
+    frame_duration: 20 # if 0 not augment
+    min_bps: 1000
+    max_bps: 6000
+    min_packet_loss_rate: 0.0
+    max_packet_loss_rate: 0.3
+    decode_missing_packet_rate: 0.5
 trainer:
   accelerator: 'auto'
   accumulate_grad_batches: 5
