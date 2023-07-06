@@ -60,7 +60,7 @@ class NegSTOILoss(nn.Module):
     def __init__(self,
                  sample_rate: int,
                  use_vad: bool = True,
-                 extended: bool = False,
+                 extended: bool = True,
                  do_resample: bool = True):
         super().__init__()
         # Independant from FS

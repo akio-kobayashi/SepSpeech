@@ -59,7 +59,7 @@ def main(args):
     
     sample_rate = config['dataset']['segment']['sample_rate']
     _pesq = PerceptualEvaluationSpeechQuality(sample_rate, 'wb').to(device)
-    _stoi = ShortTimeObjectiveIntelligibility(sample_rate, extended=False).to(device)
+    _stoi = ShortTimeObjectiveIntelligibility(sample_rate, extended=True).to(device)
     _sdr = ScaleInvariantSignalDistortionRatio().to(device)
     
     df_out = pd.DataFrame(index=None, 
