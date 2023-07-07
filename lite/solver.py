@@ -74,7 +74,7 @@ class LitSepSpeaker(pl.LightningModule):
 
         if self.pesq_loss:
             with torch.cuda.amp.autocast('cuda', torch.float32):
-                _pesq_loss = self.pesq(target, estimate)
+                _pesq_loss = torch.mean(self.pesq(target, estimate))
             if valid:
                 d['valid_pesq_loss'] = _pesq_loss
             else:
@@ -82,7 +82,8 @@ class LitSepSpeaker(pl.LightningModule):
             _loss += self.pesq_loss_weight * _pesq_loss
 
         if self.sdr_loss:
-            _sdr_loss = self.sdr_loss(estimate, target)
+            with torch.cuda.amp.autocast('cuda', torch.float32):
+                _sdr_loss = torch.mean(self.sdr_loss(estimate, target))
             if valid:
                 d['valid_sdr_loss'] = _sdr_loss
             else:
@@ -90,7 +91,8 @@ class LitSepSpeaker(pl.LightningModule):
             _loss += self.sdr_loss_weight * _sdr_loss
 
         if self.stoi_loss:
-            _stoi_loss = self.stoi_loss(estimate, target)
+            with torch.cuda.amp.autocast('cuda', torch.float32):
+                _stoi_loss = torch.mean(self.stoi_loss(estimate, target))
             if valid:
                 d['valid_stoi_loss'] = _stoi_loss
             else:

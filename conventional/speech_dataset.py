@@ -9,6 +9,7 @@ from typing import Tuple
 from torch import Tensor
 import torchaudio
 from augment.opus_augment import OpusAugment
+from augment.reverb_augment import ReverbAugment
 
 '''
     音声強調用データの抽出
@@ -95,10 +96,26 @@ class SpeechDatasetOTFMix(SpeechDataset):
         self.noise_df = pd.read_csv(noise_csv_path)
         self.min_snr=mixing['min_snr']
         self.max_snr=mixing['max_snr']
-        self.opus = None:
-        if augment['frame_duration'] > 0:
-            self.opus = OpusAugment(augment)
-
+        self.opus, self.source_reverb, self.noise_reverb = None, None, None
+        if augment['opus']['use']:
+            self.opus = OpusAugment(augment['opus'])
+        if augment['reverb']['use']:
+            self.source_reverb = ReverbAugment(augment['reverb']['sample_rate'],
+                                               augment['reverb']['room_size'],
+                                               augment['reverb']['mic_loc'],
+                                               augment['reverb']['source_loc'],
+                                               augment['reverb']['source_loc_range'],
+                                               augment['reverb']['min_rt60'],
+                                               augment['reverb']['max_rt60'],
+                                               augment['reverb']['snr'])
+            self.noise_reverb = ReverbAugment(augment['reverb']['sample_rate'],
+                                              augment['reverb']['room_size'],
+                                              augment['reverb']['mic_loc'],
+                                              augment['reverb']['noise_loc'],
+                                              augment['reverb']['noise_loc_range'],
+                                              augment['reverb']['min_rt60'],
+                                              augment['reverb']['max_rt60'],
+                                              augment['reverb']['snr'])
     def rms(self, wave):
         return torch.sqrt(torch.mean(torch.square(wave)))
 
@@ -126,6 +143,9 @@ class SpeechDatasetOTFMix(SpeechDataset):
         assert os.path.exists(source_path)
         source, sr = torchaudio.load(source_path)
         source = source[start:stop]
+        reverb_source = None
+        if self.source_reverb:
+            reverb_source = self.source_reverb(source)
 
         source_speaker = int(row['index'])
         filtered = self.enroll_df.query('index == @source_speaker')
@@ -145,12 +165,28 @@ class SpeechDatasetOTFMix(SpeechDataset):
             noise = noise[start:stop]
         else:
             noise=None
+        reverb_noise = None:
+        if self.noise_reverb:
+            reverb_noise = self.noise_reverb(noise)
 
+        # mixing
         snr = np.random.rand() * (self.max_snr-self.min_snr) + self.min_snr
-        mixture = self.mix(source, noise, snr)
+        if reverb_source:
+            mixture = self.mix(reverb_source, reverb_noise, snr)
+        else:
+            mixture = self.mix(source, noise, snr)
 
+        # opus encode/decode
         if self.opus:
             mixture = self.opus(mixture)
+
+        # normalize
+        std, mean = torch.std_mean(mixture, dim=-1)
+        mixture = (mixture - mean)/std
+        std, mean = torch.std_mean(source, dim=-1)
+        source = (source - mean)/std
+        std, mean = torch.std_mean(enroll, dim=-1)
+        enroll = (enroll - mean)/std
 
         return mixture, source, enroll, source_speaker
 
@@ -187,3 +223,21 @@ def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Te
         enrolls = enrolls.unsqueeze(0)
         
     return mixtures, sources, enrolls, lengths, speakers
+
+if __name__ == '__main__':
+    import argparse
+    import yaml
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, required=True)
+    args=parser.parse_args()
+    
+    with open(args.config, 'r') as yf:
+        config = yaml.safe_load(yf)
+    csv_path = config['dataset']['train']['csv_path']
+    noise_csv_path = config['dataset']['train']['noise_csv_path']
+    enroll_csv_path = config['dataset']['train']['enroll_csv_path']
+
+    dataset = SpeechDatasetOTFMix(csv_path, noise_csv_path, enroll_csv_path, 
+                 config['augment']['mixing'], 
+                 config['augment'])

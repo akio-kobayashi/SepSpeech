@@ -9,7 +9,7 @@ import torch.nn as nn
 class OpusAugment(nn.Module):
     def __init__(self, sample_rate, frame_duration, min_bps, max_bps, 
                  min_packet_loss_rate, max_packet_loss_rate,
-                 decode_missing_packet_rate):
+                 decode_missing_packet_rate, **kwargs):
         self.min_bps = min_bps
         self.max_bps = max_bps
         self.samples_per_second = sample_rate
