@@ -12,6 +12,7 @@ for version in 1 2 3 4;do
     elif [[ $version == 4 ]]; then
 	checkpoint=lightning_logs/version_${version}/checkpoints/checkpoint_epoch=153-step=185570-valid_loss=0.044.ckpt
     fi
+    echo $checkpoint
     #config=radio.yaml
     #checkpoint=lightning_logs/version_1/checkpoints/checkpoint_epoch\=144-step\=174725-valid_loss\=0.078.ckpt
     input_csv=audio/csv/test.csv

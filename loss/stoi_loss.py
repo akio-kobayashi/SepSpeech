@@ -171,7 +171,7 @@ class NegSTOILoss(nn.Module):
             corr_comp = y_prim * x_seg
             # J, M as in [1], eq.6
             correction = x_seg.shape[1] * x_seg.shape[-1]
-
+            
         # Compute average (E)STOI w. or w/o VAD.
         sum_over = list(range(1, x_seg.ndim))  # Keep batch dim
         if self.use_vad:
@@ -212,7 +212,7 @@ class NegSTOILoss(nn.Module):
         # Last frame not taken because NFFT size is larger, torch bug IMO.
         x_padded = torch.nn.functional.pad(x, pad=[0, hop])
         return torch.stft(x_padded, fft_size, hop_length=hop, window=win,
-                          center=False, win_length=win_len)
+                          center=False, win_length=win_len, return_complex=False)
 
     @staticmethod
     def rowcol_norm(x, mask=None):
