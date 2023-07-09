@@ -1,85 +1,113 @@
+import os
 import torch
-from torch import Tensor
 import torch.nn as nn
-import pytorch_lightning as pl
-from typing import Tuple
-from model import ASRModel, CELoss, CTCLoss
-from transducer import ASRTransducer
-from torchaudio.modles import RNNTBeamSearch
+import torch.utils.data as data
+import torch.optim as optim
+import torch.nn.functional as F
+from generator import SpeechDataset
+import metric
+import numpy as np
 
-class LitASR(pl.LightningModule):
-    def __init__(self, config:dict) -> None:
-        super().__init__()
-        self.config = config
+def train(network, device, train_loader, optimizer, scheduler, epoch,
+            iter_meter, writer):
+    network.train()
 
-        self.model = ASRTransducer(config)
-        #self.model = ASRModel(config)
-        #self.ce_loss = CELoss()
-        #self.ctc_loss = CTCLoss()
-        self.lr = config['optimizer']['lr']
+    data_len = len(train_loader.dataset)
 
-        #self.ce_weight = config['model']['ce_weight']
+    for batch_idx, _data in enumerate(train_loader):
+        inputs, labels, input_lengths, label_lengths, _ = _data
+
+        input_lengths = network.valid_input_lengths(input_lengths)
         
-        self.decoder = RNNTBeamSearch(self.model, blank=0)
+        inputs, labels = inputs.to(device), labels.to(device)
+        input_lengths, label_lengths = torch.tensor(input_lengths).to(torch.int32), torch.tensor(label_lengths).to(torch.int32)
+        input_lengths.to(device), label_lengths.to(device)
 
-        self.save_hyperparameters()
+        optimizer.zero_grad()
+        loss = network(inputs, labels, input_lengths, label_lengths)
+        loss.backward()
 
-    def forward(self, inputs:Tensor, labels:Tensor,
-                input_lengths:list, label_lengths:list) -> Tensor:
-        _loss = self.model(inputs, labels, input_lengths, label_lengths)
-        return _loss
-        #y, _ctc = self.model(inputs, labels, input_lengths, label_lengths)
-        #return y, _ctc
+        if writer:
+            writer.add_scalar('loss', loss.item(), iter_meter.get())
+            writer.add_scalar('learning_rate', scheduler.get_lr()[0], iter_meter.get())
 
-    def training_step(self, batch, batch_idx:int) -> Tensor:
-        inputs, labels, input_lengths, label_lengths, _ = batch
+        optimizer.step()
+        scheduler.step()
+        iter_meter.step()
 
-        #_pred, _ctc_loss = self.forward(inputs, labels, input_lengths, label_lengths)
-        #labels_out = labels[:, 1:]
-        #label_lengths = [l -1 for l in label_lengths]
-        #_ce_loss = self.ce_loss(_pred, labels_out, label_lengths)
-        #self.log_dict({'train_ce_loss': _ce_loss})
-        #self.log_dict({'train_ctc_loss': _ctc_loss})
-        #_loss = self.ce_weight * _ce_loss + _ctc_loss
-        _loss = self.forward(inputs, labels, input_lengths, label_lengths)
-        self.log_dict({'train_loss': _loss})
+        if batch_idx % 100 == 0 or batch_idx == data_len:
+            print('Train Epcoh: {} [{}/{} ({:.0f}%)]\t Loss: {:.6f}'.format(
+                epoch, batch_idx * len(inputs), data_len,
+                100. * batch_idx / len(train_loader), loss.item())
+                )
+        del loss
+        torch.cuda.empty_cache()
 
-        return _loss
+def test(network, device, test_loader, epoch, iter_meter, writer):
+    network.eval()
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0) -> Tensor:
-        inputs, labels, input_lengths, label_lengths, _ = batch
+    test_loss = 0
+    test_cer=[]
+    with torch.no_grad():
+        for i, _data in enumerate(test_loader):
+            inputs, labels, input_lengths, label_lengths, _ = _data
 
-        #_pred, _ctc_loss = self.forward(inputs, labels, input_lengths, label_lengths)
-        #labels_out = labels[:, 1:]
-        #label_lengths = [l -1 for l in label_lengths]
-        #_ce_loss = self.ce_loss(_pred, labels_out, label_lengths)
-        #self.log_dict({'valid_ce_loss': _ce_loss})
-        #self.log_dict({'valid_ctc_loss': _ctc_loss})
-        #_loss = self.ce_weight * _ce_loss + _ctc_loss
-        _loss = self.forward(inputs, labels, input_lengths, label_lengths)
-        self.log_dict({'valid_loss': _loss})
+            input_lengths = network.valid_input_lengths(input_lengths)
+            
+            inputs, labels = inputs.to(device), labels.to(device)
+            input_lengths, label_lengths = torch.tensor(input_lengths).to(torch.int32), torch.tensor(label_lengths).to(torch.int32)
+            input_lengths.to(device), label_lengths.to(device)
 
-        #outputs, _ = self.model.model.transcribe(inputs, torch.tensor(input_lengths).cuda())
-        #print(outputs.shape)
-        #outputs = outputs.cpu().detach().numpy()
-        
-        return _loss
+            loss = network(inputs, labels, input_lengths, label_lengths)
+            test_loss += loss.item()/len(test_loader)
 
-    def configure_optimizers(self):
-        #optimizer=torch.optim.Adam(self.parameters(),
-        #                           **self.config['optimizer'])
-        optimizer = torch.optim.RAdam(
-            self.parameters(),
-            **self.config['optimizer'])
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer,
-            **self.config['scheduler']
-        )
-        return [optimizer], [scheduler]
-        #return optimizer
+            for j in range(inputs.shape[0]):
+                pred,_ = network.greedy_decode(torch.unsqueeze(inputs[j],0))
+                target = labels[j][:label_lengths[j]].tolist()
+                c=metric.cer(target, pred)
+                test_cer.append(c)
 
-    def decode(self, inputs:Tensor, input_lengths:list) -> list:
-        #decoded = self.model.greedy_decode(inputs, input_lengths)
-        hypotheses, state = self.decoder.infer(inputs, input_lengths, 10, state=None, hypothesis=None)
-        return hypotheses
-    
+    avg_cer = sum(test_cer)/len(test_cer)
+    print('Test Epcoh: {} \t Loss: {:.3f} CER: {:.3f}'.format(
+        epoch, test_loss, avg_cer))
+
+    # write logs
+    if writer:
+        writer.add_scalar('test_loss', test_loss, iter_meter.get())
+        writer.add_scalar('cer', avg_cer, iter_meter.get())
+
+    return avg_cer
+
+def decode(network, device, test_loader, tokenizer, outpath):
+    network.eval()
+
+    test_loss = 0
+    test_cer=[]
+    n=0
+
+    with open(outpath, 'w') as f:
+        with torch.no_grad():
+            for i, _data in enumerate(test_loader):
+                inputs, labels, input_lengths, label_lengths, keys = _data
+
+                input_lengths = network.valid_input_lengths(input_lengths)
+                inputs, labels = inputs.to(device), labels.to(device)
+                input_lengths, label_lengths = torch.tensor(input_lengths).to(torch.int32), torch.tensor(label_lengths).to(torch.int32)
+                input_lengths.to(device), label_lengths.to(device)
+
+                xs = network.ff_encoder(inputs)
+                for j in range(xs.shape[0]):
+                    # pred, logp = network.beam_search(torch.unsqueeze(xs[j],0))
+                    pred, logp = network.greedy_decode(torch.unsqueeze(xs[j],0), False)
+
+                    target = labels[j][:label_lengths[j]].tolist()
+                    c=metric.cer(target, pred)
+                    test_cer.append(c)
+                
+                    output = tokenizer.token2text(pred)
+                    output = ' '.join(list(output))
+                
+                    f.write(f'{output} ({keys[j]})\n')
+
+    avg_cer = sum(test_cer)/len(test_cer)
+    return avg_cer

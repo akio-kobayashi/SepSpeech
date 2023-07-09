@@ -4,114 +4,27 @@ import torch
 import torch.nn as nn
 from torch import autograd
 import torch.nn.functional as F
-import conformer
 from warprnnt_pytorch import RNNTLoss
-from conformer import ConformerConvModule, ConformerBlock
-from cntf import CNTF
 from einops import rearrange
 from loss import MaskedMSELoss
 import math
 import numpy as np
+from model import Sequence, Subsampler, DownSampler
 
-class Sequence():
-    def __init__(self, seq=None, blank=0):
-        if seq is None:
-            self.g = [] # predictions of phoneme language model
-            self.k = [blank] # prediction phoneme label
-            # self.h = [None] # input hidden vector to phoneme model
-            self.h = None
-            self.logp = 0 # probability of this sequence, in log scale
-        else:
-            self.g = seq.g[:] # save for prefixsum
-            self.k = seq.k[:]
-            self.h = seq.h
-            self.logp = seq.logp
-        self.transform=PhoneTransform()
-
-    def __str__(self):
-        #print(self.k)
-        return 'Prediction: {}\nlog-likelihood {:.2f}\n'.format(self.transform.int_to_text(self.k), -self.logp)
-
-class Subsampler(nn.Module):
-    def __init__(self, ):
-        super(Subsampler, self).__init__()
-        self.subsampler = nn.Sequential(
-                nn.Conv2d(in_channels=1,out_channels=64,
-                            kernel_size=3, stride=1, padding=3//2, padding_mode='replicate',bias=False),
-                nn.BatchNorm2d(num_features=64),
-                nn.ReLU(),
-                nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-                nn.Conv2d(in_channels=64,out_channels=128,
-                            kernel_size=3, stride=1, padding=3//2, padding_mode='replicate', bias=False),
-                nn.BatchNorm2d(num_features=128),
-                nn.ReLU(),
-                nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        )
-        self.feedforward=nn.Linear(20*128, 80)
-
-    def forward(self, x):
-        # add channel
-        x = x.unsqueeze(dim=1)
-        x = self.subsampler(x) # (B, 1, T, F) -> (B, 128, T//4, F//4)
-        x = rearrange(x, 'b c t f -> b t (c f)')
-        x = self.feedforward(x) # (B, T//4, 80)
-
-        return x
-
-class DownSampler(nn.Module):
-    def __init__(self, output_dim):
-        super(DownSampler, self).__init__()
-        self.block1=nn.Sequential(nn.Conv2d(in_channels=1,out_channels=32,
-                                    kernel_size=3, stride=1, padding=3//2,
-                                    padding_mode='replicate',bias=False),
-                                    nn.InstanceNorm2d(32),
-                                    nn.LeakyReLU())
-        # time//2, feats//2
-        self.ds1=nn.MaxPool2d(kernel_size=2, stride=2, padding=0)#, ceil_mode=True)
-        self.block2=nn.Sequential(nn.Conv2d(in_channels=32,out_channels=128,
-                                    kernel_size=3, stride=1, padding=3//2,
-                                    padding_mode='replicate', bias=False),
-                                    nn.InstanceNorm2d(128),
-                                    nn.LeakyReLU())
-        # time//4, feats//4
-        self.ds2=nn.MaxPool2d(kernel_size=2, stride=2)#, ceil_mode=True)
-        self.feedforward=nn.Linear(20*128, output_dim)
-
-    def forward(self, x):
-        x = x.unsqueeze(dim=1)
-        x = self.block1(x) # (B, 1, T, F) -> (B, 128, T, F)
-        x = self.ds1(x)
-        x = self.block2(x)
-        x = self.ds2(x)
-        x = rearrange(x, 'b c t f -> b t (c f)')
-        x = self.feedforward(x) # (B, T//4, 80)
-
-        return x
-
-    def _valid_lengths(self, input_lengths, kernel_size=3, stride=1, padding=0, dilation=1.)->list:
-        leng=[]
-        for l in input_lengths:
-            l = int(np.floor((l + 2*padding - dilation * (kernel_size-1) - 1)/stride + 1))
-            leng.append(l)
-        return leng
-    
-    def valid_lengths(self, leng):
-        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=3//2)
-        leng = self._valid_lengths(leng, kernel_size=2, stride=2, padding=0)
-        leng = self._valid_lengths(leng, kernel_size=3, stride=1, padding=3//2)
-        leng = self._valid_lengths(leng, kernel_size=2, stride=2, padding=0)
-
-        return leng
-        
-'''
- RNN Transducer
-    from https://github.com/HawkAaron/E2E-ASR/blob/91d6b96bd605a9bc8e62b4a5903ec2056fa0f88d/model.py#L37
-'''
-class Transducer(nn.Module):
-    def __init__(self, device, vocab_size, hidden_size=144,
-                 cell_size=320, num_layers=16, num_heads=8,
-                 dropout=.5, blank=0):
-        super(Transducer, self).__init__()
+class TransTransducer(nn.Module):
+    def __init__(self, device,
+                 input_vocab_size,
+                 embed_size,
+                 vocab_size,
+                 hidden_size=144,
+                 cell_size=320,
+                 num_layers=16,
+                 num_heads=8,
+                 dropout=.5,
+                 blank=0):
+        super(TransTransducer, self).__init__()
+        self.input_vocab_size = input_vocab_size
+        self.embed_size = embed_size
         self.blank = blank
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -121,28 +34,11 @@ class Transducer(nn.Module):
 
         # NOTE encoder & decoder only use lstm
         # instead of RNN, just use conformer block
-        layers=[]
-        for n in range(num_layers):
-            layers.append(
-                ConformerBlock(
-                    dim = hidden_size,
-                    dim_head = 64,
-                    heads = self.num_heads,
-                    ff_mult = 4,
-                    conv_expansion_factor = 2,
-                    conv_kernel_size = 31,
-                    attn_dropout = 0.,
-                    ff_dropout = 0.,
-                    conv_dropout = 0.
-                )
-            )
-        self.encoder = nn.Sequential(*layers) # (B, T, F)
-
+        encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads)
+        self.encoder = nn.TransformerEncoder(encoder_layer, self.num_layers)
+        self.input_embed = nn.Embedding(self.input_vocab_size, hidden_size)
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
         
-        self.downsampler=DownSampler(output_dim=hidden_size)
-        #CNTF(output_dim=hidden_size)
-
         self.embed = nn.Embedding(vocab_size, vocab_size-1, padding_idx=blank)
         self.embed.weight.data[1:] = torch.eye(vocab_size-1)
         self.embed.weight.requires_grad = False
@@ -153,11 +49,7 @@ class Transducer(nn.Module):
         self.fc2 = nn.Linear(cell_size, vocab_size)
 
     def valid_input_lengths(self, x):
-        if self.downsampler is not None:
-            y = self.downsampler.valid_lengths(x)
-        else:
-            y =x
-        return y
+        return x
     
     def joint(self, f, g):
         ''' `f`: encoder output (B,T,U,2H)
@@ -169,16 +61,14 @@ class Transducer(nn.Module):
         return self.fc2(out)
 
     def ff_encoder(self, xs):
-        if self.downsampler is not None:
-            xs = self.downsampler(xs)
+        xs = self.input_embed(xs)
         xs = self.encoder(xs)
         xs = self.fc0(xs)
 
         return xs
 
     def forward(self, xs, ys, xlen, ylen, return_loss=True):
-        if self.downsampler is not None:
-            xs = self.downsampler(xs)
+        xs = self.input_embed(xs)
         xs = self.encoder(xs)
         xs = self.fc0(xs) # (B, time//scale, hidden_size)
 
@@ -207,7 +97,6 @@ class Transducer(nn.Module):
         if ys.is_cuda:
             xlen = xlen.cuda()
             ylen = ylen.cuda()
-            
         loss = self.loss(out, ys.int(), xlen, ylen)
 
         return loss

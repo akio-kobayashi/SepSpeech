@@ -74,6 +74,7 @@ class ASRTransducer(nn.Module):
             torch.tensor([[1]]).cuda(),
             state
         )
+        prev=-1
         for i in range(leng):
             outputs, output_source_lengths, output_target_lengths = self.model.join(source_encodings[:, i, :].unsqueeze(0),
                                                                                     torch.tensor([[1]]).cuda(),
@@ -81,8 +82,9 @@ class ASRTransducer(nn.Module):
                                                                                     torch.tensor([[1]]).cuda()
                                                                                     )
             pred = torch.reshape(torch.argmax(outputs, dim=-1), (1,1))
-            if pred != 0:
+            if pred != 0 and prev != pred:
                 targets.append(pred.cpu().detach().numpy()[0,0])
+                prev = pred.cpu().detach().numpy()[0,0]
             target = pred
             target_encodings, target_lengths, state = self.model.predict(
                 target.cuda(),

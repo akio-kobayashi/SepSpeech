@@ -1,0 +1,84 @@
+model_type: conformer
+eos: '</s>'
+bos: '<s>'
+# dataset
+dataset:
+  process:
+    batch_size: 8
+    num_workers: 1
+  segment:
+    segment: 20
+    sample_rate: 16000
+  train:
+    csv_path: '/export/20230515/train_braille.csv'
+  valid:  
+    csv_path: '/export/20230515/valid_braille.csv'
+  test:
+    csv_path: ./temp.csv #'/export/20230515/valid_braille.csv' #'/export/20230515/test_braille.csv'
+  tokenizer: '/export/20230515/braille_tokenizer/vocab.json'
+  max_length: 1000
+analysis:
+  sample_rate: 16000
+  nfft: 400
+  win_length: 400
+  hop_length: 160
+  n_mels: 80
+  global_mean_std: '/export/20230515/global_mean_std.npz'
+  sort_by_len: false
+augment:
+  specaug: false
+  time_mask: 80
+  freq_mask: 80
+# trainer parameters
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 10
+  precision: '16-mixed'
+  profiler: #'simple'
+  gradient_clip_val: 5.
+optimizer:
+  lr: 4.e-5
+scheduler:
+  max_lr: 1.e-4
+  epochs: 1000
+  steps_per_epoch: 1000
+logger:
+  save_dir: './'
+  version: 3
+  name: 'lightning_logs'
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_top_k: 3
+  mode: 'min'
+  every_n_epochs: 1
+model:
+  dim_input: 80
+  dim_model: 512 #256 # conformer(L)
+  dim_output: 71 # number of alphabets
+  num_heads: 8
+  dim_feedforward: 1024
+  num_encoder_layers: 6 #16
+  num_decoder_layers: 6 #16 #8
+  kernel_size: 31 #3 #31
+  cntf_channels: 104
+  cntf_kernel_size: 7
+  ce_weight: 0.1
+decode:
+  decode_max_len: 256
+transducer:
+  input_dim: 80 # input dim to encoder network
+  time_reduction_stride: 1
+  encoding_dim: 256
+  conformer_input_dim: 256
+  conformer_ffn_dim: 1024
+  conformer_num_layers: 12
+  conformer_num_heads: 8 
+  conformer_depthwise_conv_kernel_size: 31
+  conformer_dropout: .1
+  num_symbols: 71
+  symbol_embedding_dim: 256
+  num_lstm_layers: 1
+  lstm_hidden_dim: 256
+  lstm_dropout: .1
