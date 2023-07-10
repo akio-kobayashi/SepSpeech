@@ -100,22 +100,14 @@ class SpeechDatasetOTFMix(SpeechDataset):
         if augment['opus']['use']:
             self.opus = OpusAugment(augment['opus'])
         if augment['reverb']['use']:
-            self.source_reverb = ReverbAugment(augment['reverb']['sample_rate'],
-                                               augment['reverb']['room_size'],
-                                               augment['reverb']['mic_loc'],
+            self.source_reverb = ReverbAugment(**augment['reverb']['params'],
                                                augment['reverb']['source_loc'],
                                                augment['reverb']['source_loc_range'],
-                                               augment['reverb']['min_rt60'],
-                                               augment['reverb']['max_rt60'],
-                                               augment['reverb']['snr'])
-            self.noise_reverb = ReverbAugment(augment['reverb']['sample_rate'],
-                                              augment['reverb']['room_size'],
-                                              augment['reverb']['mic_loc'],
+            )
+            self.noise_reverb = ReverbAugment(**augment['reverb']['params'],
                                               augment['reverb']['noise_loc'],
                                               augment['reverb']['noise_loc_range'],
-                                              augment['reverb']['min_rt60'],
-                                              augment['reverb']['max_rt60'],
-                                              augment['reverb']['snr'])
+            )
     def rms(self, wave):
         return torch.sqrt(torch.mean(torch.square(wave)))
 

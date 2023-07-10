@@ -6,14 +6,15 @@ import torch
 import torch.nn as nn
 
 class ReverbAugment(nn.Module):
-    def __init__(self, sample_rate,  
+    def __init__(self, sample_rate,
+                 min_rt60,
+                 max_rt60,
+                 snr,  
                  room_size:list, 
                  mic_loc:list, 
                  source_loc:list,
                  loc_range:list,
-                 min_rt60=0.2,
-                 max_rt60=1.0,
-                 snr=60) -> None: 
+                 ) -> None: 
         
         self.snr = snr
         self.min_rt60=min_rt60
