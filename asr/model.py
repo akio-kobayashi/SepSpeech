@@ -140,8 +140,8 @@ class Transducer(nn.Module):
 
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
         
-        self.downsampler=DownSampler(output_dim=hidden_size)
-        #CNTF(output_dim=hidden_size)
+        #self.downsampler=DownSampler(output_dim=hidden_size)
+        self.downsampler=CNTF(output_dim=hidden_size)
 
         self.embed = nn.Embedding(vocab_size, vocab_size-1, padding_idx=blank)
         self.embed.weight.data[1:] = torch.eye(vocab_size-1)
