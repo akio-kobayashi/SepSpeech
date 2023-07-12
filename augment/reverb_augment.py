@@ -15,7 +15,7 @@ class ReverbAugment(nn.Module):
                  source_loc:list,
                  loc_range:list,
                  ) -> None: 
-        
+        super().__init__()
         self.snr = snr
         self.min_rt60=min_rt60
         self.max_rt60=max_rt60
@@ -35,14 +35,22 @@ class ReverbAugment(nn.Module):
         self.source_loc = source_loc
         self.loc_range = loc_range
 
-        assert self.source_loc + self.loc_range < self.room_size and self.source_loc - self.loc_range < self.room_size
+        #assert self.source_loc + self.loc_range < self.room_size and self.source_loc - self.loc_range < self.room_size
 
-    def forward(self, source):
+    def get_rt60s(self):
+        return self.min_rt60, self.max_rt60
+    
+    def forward(self, source, rt60=0.0):
         # tensor -> 1d-ndarray
+        org_max = torch.max(torch.abs(source))
+        
         source = source.squeeze().cpu().detach().numpy()
         original_length = len(source)
 
-        rt60 = (self.max_rt60 - self.min_rt60) * np.random.rand() + self.min_rt60
+        if rt60 == 0.0:
+            rt60 = (self.max_rt60 - self.min_rt60) * np.random.rand() + self.min_rt60
+        print(f'RT60: {rt60:.3f}')
+        
         _, max_order = pra.inverse_sabine(rt60, self.room_size)
 
         room = pra.ShoeBox(
@@ -52,11 +60,13 @@ class ReverbAugment(nn.Module):
         )
         room.add_microphone(self.mic_loc)
 
-        source_loc = self.source_loc + self.loc_range * 2 * (np.random.rand() - .5)
-        room.add_source(source_loc, signal=source)
+        source_loc = np.array(self.source_loc) + np.array(self.loc_range) * 2 * (np.random.rand() - .5)
+        room.add_source(source_loc.tolist(), signal=source)
 
         room.simulate(self.snr)
         target = room.mic_array.signals[0, :]
-        target = torch.from_numpy(target[:original_length,], torch.float32).unsqueeze(0)
+        target = torch.from_numpy(target[:original_length,]).to(torch.float32).unsqueeze(0)
+
+        target = target / torch.max(torch.abs(target)) * org_max
         
         return target

@@ -22,13 +22,13 @@ dataset:
 augment:
   # on-the-fly mixing
   mixing:
-    min_snr: 0
+    min_snr: 10
     max_snr: 20
   opus:
     sample_rate: 16000
     frame_duration: 20
-    min_bps: 1000
-    max_bps: 6000
+    min_bps: 6000
+    max_bps: 20000
     min_packet_loss_rate: 0.0
     max_packet_loss_rate: 0.3
     decode_missing_packet_rate: 0.5

@@ -1,8 +1,8 @@
 import torch
 import torchaudio
 import numpy as np
-from opus_augment import OpusAugment
-from reverb_augment import ReverbAugment
+from augment.opus_augment import OpusAugment
+from augment.reverb_augment import ReverbAugment
 import argparse
 import yaml
 
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
-    parser.add_argument('--source', tpye=str, required=True)
+    parser.add_argument('--source', type=str, required=True)
     parser.add_argument('--noise', type=str, required=True)
     #parser.add_argument('--enroll', type=str, required=True)
     parser.add_argument('--output', type=str, required=True)
@@ -37,28 +37,31 @@ if __name__ == '__main__':
         config = yaml.safe_load(yf)
 
     reverb_source_func = ReverbAugment(**config['augment']['reverb']['params'],
-                                       config['augment']['reverb']['source_loc'],
-                                       config['augment']['reverb']['source_loc_range']
+                                       source_loc=config['augment']['reverb']['source_loc'],
+                                       loc_range=config['augment']['reverb']['source_loc_range']
     )
     reverb_noise_func = ReverbAugment(**config['augment']['reverb']['params'],
-                                      config['augment']['reverb']['noise_loc'],
-                                      config['augment']['reverb']['noise_loc_range']
+                                      source_loc=config['augment']['reverb']['noise_loc'],
+                                      loc_range=config['augment']['reverb']['noise_loc_range']
     )
-    opus_func = OpusAugment(config['augment']['opus'])
+    opus_func = OpusAugment(**config['augment']['opus'])
 
     source, sr = torchaudio.load(args.source)
-    noise = torchaudio.load(args.noise)
+    noise, sr = torchaudio.load(args.noise)
     #enroll = torchaudio.load(args.enroll)
 
-    start = np.random.randint(0, len(noise) - len(source))
-    stop = start + len(source)
-    noise = noise[start:stop]
+    start = np.random.randint(0, noise.shape[-1] - source.shape[-1])
+    stop = start + source.shape[-1]
+    noise = noise[:, start:stop]
 
-    reverb_noise = reverb_noise_func(noise)
-    reverb_source = reverb_source_func(source)
+    min_rt60, max_rt60 = reverb_noise_func.get_rt60s()
+    rt60 = (max_rt60 - min_rt60) * np.random.rand() + min_rt60
+
+    reverb_noise = reverb_noise_func(noise, rt60)
+    reverb_source = reverb_source_func(source, rt60)
 
     snr = np.random.rand() * (max_snr-min_snr) + min_snr
     mixture = mix(reverb_source, reverb_noise, snr)
-
+    #mixture = mix(source, noise, snr)
     mixture = opus_func(mixture)
     torchaudio.save(filepath=args.output, src=mixture.to('cpu'), sample_rate=sr) # save as float

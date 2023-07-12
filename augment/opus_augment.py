@@ -5,11 +5,13 @@ import os
 import torchaudio
 import torch
 import torch.nn as nn
+import librosa
 
 class OpusAugment(nn.Module):
     def __init__(self, sample_rate, frame_duration, min_bps, max_bps, 
                  min_packet_loss_rate, max_packet_loss_rate,
                  decode_missing_packet_rate, **kwargs):
+        super().__init__()
         self.min_bps = min_bps
         self.max_bps = max_bps
         self.samples_per_second = sample_rate
@@ -36,7 +38,7 @@ class OpusAugment(nn.Module):
         opus_decoder.set_sampling_frequency(self.samples_per_second)
 
         original_length = x.shape[-1] # (channels, length)
-        wave_samples = x.cpu().detach().numpy.squeeze()
+        wave_samples = x.cpu().detach().numpy().squeeze()
         wave_samples = np.array([ int(s*32768) for s in wave_samples]).astype(np.int16).tobytes()
 
         packet_loss_rate = np.random.rand() * (self.max_packet_loss_rate - self.min_packet_loss_rate) + self.min_packet_loss_rate
@@ -87,5 +89,6 @@ class OpusAugment(nn.Module):
 
         decoded_pcm = np.array(decoded).reshape(1, -1)[:, :original_length] # float
 
+        print(f'Bitrate: {bps}, packet loss: {packet_loss_rate:.3f}')
         return torch.from_numpy(decoded_pcm)
         
