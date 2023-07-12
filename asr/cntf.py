@@ -64,6 +64,36 @@ class LayerNorm(nn.Module):
         x = rearrange(x, 'b t f c -> b c t f')
         return x
 
+class Res2NetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.pointwise1 = PointwiseConv(in_channels, out_channels)
+        self.kernel1 = DepthwiseConv(in_chanels=in_channels,
+                                     kernel_size=3,
+                                     padding=3//2
+                                     )
+        self.kernel2 = DepthwiseConv(in_chanels=in_channels,
+                                     kernel_size=3,
+                                     padding=3//2
+                                     )
+        self.kernel3 = DepthwiseConv(in_chanels=in_channels,
+                                     kernel_size=3,
+                                     padding=3//2
+                                     )
+        self.pointwise2 = PointwiseConv(in_channels, out_channels)
+    
+    def forward(self, x):
+        assert x.shape[-1]%4 == 0
+        n_dim = x.shape[-1]//4
+        y = self.pointwise1(x)
+        z = torch.zero_like(y)
+        z[:, :, :, :n_dim] = y[:, :, :, :n_dim]
+        z[:, :, :, n_dim:2*n_dim] = self.kernel1(y[:, :, :, n_dim:2*n_dim])
+        z[:, :, :, 2*n_dim:3*n_dim] = self.kernel2(z[:, :, :, n_dim:2*n_dim] + y[:, :, :, n_dim:2*n_dim])
+        z[:, :, :, 3*n_dim:] = self.kernel3(z[:, :, :, 2*n_dim:3*n_dim] + y[:, :, :, 3*n_dim:])
+        z = self.pointwise2(z)
+        return z
+
 def RepeatConvNeXTBlock(cntf_channels, kernel_size, padding=0, repeat=3):
     repeats = []
     for n in range(repeat):

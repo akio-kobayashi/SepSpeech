@@ -31,9 +31,9 @@ class Sequence():
     def __str__(self):
         #print(self.k)
         return 'Prediction: {}\nlog-likelihood {:.2f}\n'.format(self.transform.int_to_text(self.k), -self.logp)
-
+               
 class Subsampler(nn.Module):
-    def __init__(self, ):
+    def __init__(self):
         super(Subsampler, self).__init__()
         self.subsampler = nn.Sequential(
                 nn.Conv2d(in_channels=1,out_channels=64,
