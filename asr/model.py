@@ -236,11 +236,18 @@ class Transducer(nn.Module):
         return y_seq, -logp
 
 
-    def beam_search(self, xs, W=10, prefix=False):
+    def beam_search(self, xs, W=10, ff=True, prefix=False):
+        if ff is True
+            if self.downsampler is not None:
+                xs = self.downsampler(xs)
+                xs = self.encoder(xs)
+                xs = self.fc0(xs)
+        
         '''''
         `xs`: acoustic model outputs
         NOTE only support one sequence (batch size = 1)
         '''''
+        
         use_gpu = xs.is_cuda
         def forward_step(label, hidden):
             ''' `label`: int '''

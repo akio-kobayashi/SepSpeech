@@ -78,7 +78,7 @@ def test(network, device, test_loader, epoch, iter_meter, writer):
 
     return avg_cer
 
-def decode(network, device, test_loader, tokenizer, outpath):
+def decode(network, device, test_loader, tokenizer, outpath, beam_search=False):
     network.eval()
 
     test_loss = 0
@@ -97,8 +97,10 @@ def decode(network, device, test_loader, tokenizer, outpath):
 
                 xs = network.ff_encoder(inputs)
                 for j in range(xs.shape[0]):
-                    # pred, logp = network.beam_search(torch.unsqueeze(xs[j],0))
-                    pred, logp = network.greedy_decode(torch.unsqueeze(xs[j],0), False)
+                    if beam_search:
+                        pred, logp = network.beam_search(torch.unsqueeze(xs[j],0), ff=False)
+                    else:
+                        pred, logp = network.greedy_decode(torch.unsqueeze(xs[j],0), ff=False)
 
                     target = labels[j][:label_lengths[j]].tolist()
                     c=metric.cer(target, pred)
