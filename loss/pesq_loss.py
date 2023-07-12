@@ -12,8 +12,8 @@ from torch import Tensor
 from torchaudio.functional import lfilter
 from torchaudio.transforms import Spectrogram, Resample
 
-from typeguard import typechecked
-from torchtyping import TensorType
+#from typeguard import typechecked
+#from torchtyping import TensorType
 from typing import Tuple
 
 from .bark import BarkScale
@@ -113,7 +113,7 @@ class PesqLoss(torch.nn.Module):
             requires_grad=False,
         )
 
-    @typechecked
+    #@typechecked
     def align_level(
         self, signal
     ) -> Tensor:
@@ -146,7 +146,7 @@ class PesqLoss(torch.nn.Module):
 
         return signal
 
-    @typechecked
+    #@typechecked
     def preemphasize(
         self, signal
     ) -> Tensor:
@@ -174,7 +174,7 @@ class PesqLoss(torch.nn.Module):
 
         return signal
 
-    @typechecked
+    #@typechecked
     def raw(
         self, ref: Tensor, deg: Tensor
     ) -> Tuple[Tensor, Tensor]:
@@ -273,7 +273,7 @@ class PesqLoss(torch.nn.Module):
 
         return d_symm, d_asymm
 
-    @typechecked
+    #@typechecked
     def mos(
         self, ref: Tensor, deg: Tensor
     ) -> Tensor:
@@ -302,7 +302,7 @@ class PesqLoss(torch.nn.Module):
 
         return mos
 
-    @typechecked
+    #@typechecked
     def forward(
         self, ref: Tensor, deg: Tensor
     ) -> Tensor:

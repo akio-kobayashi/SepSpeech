@@ -34,19 +34,19 @@ class LitSepSpeaker(pl.LightningModule):
 
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
-        if config['loss']['stft']['use']:
+        if config['loss']['stft_loss']['use']:
             self.stft_loss = MultiResolutionSTFTLoss()
-            self.stft_loss_weight = config['loss']['stft']['weight']
-        if config['loss']['pesq']['use']:
+            self.stft_loss_weight = config['loss']['stft_loss']['weight']
+        if config['loss']['pesq_loss']['use']:
             self.pesq_loss = PesqLoss(factor=1.,
                                       sample_rate=16000)
-            self.pesq_loss_weight = config['loss']['pesq']['weight']
+            self.pesq_loss_weight = config['loss']['pesq_loss']['weight']
         if config['loss']['stoi_loss']['use']:
             self.stoi_loss = NegSTOILoss()
-            self.stoi_loss_weight = config['loss']['stoi']['weight']
+            self.stoi_loss_weight = config['loss']['stoi_loss']['weight']
         if config['loss']['sdr_loss']['use']:
             self.sdr_loss = NegativeSISDR()
-            self.sdr_loss_weight = config['loss']['sdr']['weight']
+            self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
 
         self.save_hyperparameters()
 

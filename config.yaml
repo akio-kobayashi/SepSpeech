@@ -1,19 +1,19 @@
 model_type: tasnet # tasnet/unet/unet2
 dataset:
   process:
-    batch_size: 8
+    batch_size: 4
     num_workers: 2
   segment:
-    segment: none
-    enroll_segment: none
+    segment: 0
+    enroll_segment: 0
     sample_rate: 16000
   train:
-    csv_path: 'audio/csv/train_3p.csv'
-    enroll_csv_path: 'audio/csv/enroll_3p.csv'
+    csv_path: 'audio/csv/jnas_train.csv'
+    enroll_csv_path: 'audio/csv/jnas_enroll.csv'
     noise_csv_path: 'audio/csv/noise_train.csv' # on-the-fly mixing
   valid:  
-    csv_path: 'audio/csv/valid_3p.csv'
-    enroll_cav_path: 'audio/csv/enroll_3p.csv'
+    csv_path: 'audio/csv/jnas_valid.csv'
+    enroll_csv_path: 'audio/csv/jnas_enroll.csv'
     noise_csv_path: 'audio/csv/noise_valid.csv'
   test:
     csv_path: 

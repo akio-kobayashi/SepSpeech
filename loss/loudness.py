@@ -5,8 +5,8 @@ from torch.nn import Parameter
 from torch import Tensor
 import numpy as np
 
-from torchtyping import TensorType
-from typeguard import typechecked
+#from torchtyping import TensorType
+#from typeguard import typechecked
 
 from .bark import centre_of_band_bark_16k, interp
 
@@ -57,7 +57,7 @@ class Loudness(torch.nn.Module):
             exp.clamp(min=1.0, max=2.0) ** 0.15 * zwicker_power, requires_grad=False
         )
 
-    @typechecked
+    #@typechecked
     def total_audible(
         self, tensor, factor: float = 1.0
     ) -> Tensor:
@@ -81,7 +81,7 @@ class Loudness(torch.nn.Module):
         tmp = (tensor * mask).sum(dim=2)
         return tmp
 
-    @typechecked
+    #@typechecked
     def time_avg_audible(
         self,
         tensor,
@@ -107,7 +107,7 @@ class Loudness(torch.nn.Module):
 
         return (tensor * mask).mean(dim=1)
 
-    @typechecked
+    #@typechecked
     def forward(
         self, pow_dens
     ) -> Tensor:

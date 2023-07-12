@@ -49,7 +49,7 @@ class ReverbAugment(nn.Module):
 
         if rt60 == 0.0:
             rt60 = (self.max_rt60 - self.min_rt60) * np.random.rand() + self.min_rt60
-        print(f'RT60: {rt60:.3f}')
+        #print(f'RT60: {rt60:.3f}')
         
         _, max_order = pra.inverse_sabine(rt60, self.room_size)
 

@@ -91,22 +91,22 @@ class SpeechDataset(torch.utils.data.Dataset):
 class SpeechDatasetOTFMix(SpeechDataset):
     def __init__(self, csv_path:str, noise_csv_path:str, enroll_csv_path:str, 
                  mixing:dict, augment:dict,
-                 sample_rate=16000, segment=None) -> None:
-        super().__init__(csv_path, enroll_csv_path, sample_rate=16000, segment=None)
+                 sample_rate=16000, segment=0) -> None:
+        super().__init__(csv_path, enroll_csv_path, sample_rate=16000, segment=0)
         self.noise_df = pd.read_csv(noise_csv_path)
         self.min_snr=mixing['min_snr']
         self.max_snr=mixing['max_snr']
         self.opus, self.source_reverb, self.noise_reverb = None, None, None
         if augment['opus']['use']:
-            self.opus = OpusAugment(augment['opus'])
+            self.opus = OpusAugment(**augment['opus'])
         if augment['reverb']['use']:
             self.source_reverb = ReverbAugment(**augment['reverb']['params'],
-                                               augment['reverb']['source_loc'],
-                                               augment['reverb']['source_loc_range'],
+                                               source_loc=augment['reverb']['source_loc'],
+                                               loc_range=augment['reverb']['source_loc_range'],
             )
             self.noise_reverb = ReverbAugment(**augment['reverb']['params'],
-                                              augment['reverb']['noise_loc'],
-                                              augment['reverb']['noise_loc_range'],
+                                              source_loc=augment['reverb']['noise_loc'],
+                                              loc_range=augment['reverb']['noise_loc_range'],
             )
     def rms(self, wave):
         return torch.sqrt(torch.mean(torch.square(wave)))
@@ -157,7 +157,7 @@ class SpeechDatasetOTFMix(SpeechDataset):
             noise = noise[start:stop]
         else:
             noise=None
-        reverb_noise = None:
+        reverb_noise = None
         if self.noise_reverb:
             reverb_noise = self.noise_reverb(noise)
 
