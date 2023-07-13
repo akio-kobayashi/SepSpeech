@@ -31,7 +31,8 @@ class LitSepSpeaker(pl.LightningModule):
         #self.lambda2 = config['loss']['lambda2']
 
         self.ce_loss = nn.CrossEntropyLoss(reduction='sum')
-
+        self.ce_loss_weight = config['loss']['ce_loss']['weight']
+        
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
         if config['loss']['stft_loss']['use']:
@@ -53,9 +54,9 @@ class LitSepSpeaker(pl.LightningModule):
     def forward(self, mix:Tensor, enr:Tensor) -> Tuple[Tensor, Tensor]:
         return self.model(mix, enr)
 
-    def compute_loss(self, estimate, target, valid=False):
+    def compute_loss(self, estimate, target, estimate_spk, target_spk, valid=False):
         d = {}
-        _ce_loss = self.ce_loss(estimate, target)
+        _ce_loss = self.ce_loss(estimate_spk, target_spk)
         _loss = self.ce_loss_weight * _ce_loss
 
         if valid:
@@ -111,7 +112,7 @@ class LitSepSpeaker(pl.LightningModule):
         mixtures, sources, enrolls, lengths, speakers = batch
 
         src_hat, spk_hat = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources)
+        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers)
 
         return _loss
 
@@ -126,7 +127,7 @@ class LitSepSpeaker(pl.LightningModule):
         mixtures, sources, enrolls, lengths, speakers = batch
 
         src_hat, spk_hat = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, valid=True)
+        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=True)
 
         return _loss
 
@@ -144,3 +145,20 @@ class LitSepSpeaker(pl.LightningModule):
     
     def get_model(self):
         return self.model
+
+    def get_padding_value(self):
+        self.model.cuda()
+        start = -1
+        end = -1
+        s = torch.rand(4, 1000).cuda()
+        with torch.no_grad():
+            for n in range(1000, 1100):
+                x = torch.rand(4, n)
+                o, _ = self.model(x.cuda(), s)
+                if x.shape[-1] == o.shape[-1]:
+                    if start < 0:
+                        start = n
+                    else:
+                        end = n
+                        break
+        return end - start

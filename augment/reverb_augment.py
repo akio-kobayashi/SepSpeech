@@ -42,9 +42,8 @@ class ReverbAugment(nn.Module):
     
     def forward(self, source, rt60=0.0):
         # tensor -> 1d-ndarray
-        org_max = torch.max(torch.abs(source))
-        
-        source = source.squeeze().cpu().detach().numpy()
+        org_max = torch.max(torch.abs(source), dim=-1).values
+        source = source.squeeze().cpu().detach().numpy().reshape(-1,)
         original_length = len(source)
 
         if rt60 == 0.0:
@@ -59,7 +58,6 @@ class ReverbAugment(nn.Module):
             max_order=max_order
         )
         room.add_microphone(self.mic_loc)
-
         source_loc = np.array(self.source_loc) + np.array(self.loc_range) * 2 * (np.random.rand() - .5)
         room.add_source(source_loc.tolist(), signal=source)
 
@@ -67,6 +65,7 @@ class ReverbAugment(nn.Module):
         target = room.mic_array.signals[0, :]
         target = torch.from_numpy(target[:original_length,]).to(torch.float32).unsqueeze(0)
 
-        target = target / torch.max(torch.abs(target)) * org_max
+        mx = torch.max(torch.abs(target), dim=-1).values
+        target = target / mx * org_max
         
         return target

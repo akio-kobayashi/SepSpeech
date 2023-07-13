@@ -21,13 +21,16 @@ def main(config:dict, checkpoint_path=None):
     else:
         model = LitSepSpeaker(config)
 
+    padding_value = model.get_padding_value()
+    
     train_dataset = SpeechDatasetOTFMix(csv_path=config['dataset']['train']['csv_path'],
                                         noise_csv_path=config['dataset']['train']['noise_csv_path'],
                                         enroll_csv_path=config['dataset']['train']['enroll_csv_path'],
                                         mixing=config['augment']['mixing'],
                                         augment=config['augment'],
                                         sample_rate=config['dataset']['segment']['sample_rate'],
-                                        segment=config['dataset']['segment']['segment'])
+                                        segment=config['dataset']['segment']['segment'],
+                                        padding_value=padding_value)
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
@@ -39,7 +42,8 @@ def main(config:dict, checkpoint_path=None):
                                         mixing=config['augment']['mixing'],
                                         augment=config['augment'],
                                         sample_rate=config['dataset']['segment']['sample_rate'],
-                                        segment=config['dataset']['segment']['segment'])
+                                        segment=config['dataset']['segment']['segment'],
+                                        padding_value=padding_value)
     valid_loader = data.DataLoader(dataset=valid_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
