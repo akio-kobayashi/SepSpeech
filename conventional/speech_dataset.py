@@ -20,7 +20,7 @@ from augment.reverb_augment import ReverbAugment
 '''
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0) -> None:
+    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, padding_value=0) -> None:
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(csv_path)
@@ -40,7 +40,6 @@ class SpeechDataset(torch.utils.data.Dataset):
         self.enroll_df = pd.read_csv(enroll_path)
         self.enroll_segment = enroll_segment if enroll_segment > 0 else None
         if self.enroll_segment is not None:
-            #pass
             max_len = len(self.enroll_df)
             self.seg_len = int(self.enroll_segment * self.sample_rate)
             self.enroll_df = self.enroll_df[self.enroll_df['length'] <= self.seg_len]
@@ -48,6 +47,8 @@ class SpeechDataset(torch.utils.data.Dataset):
                 f"Drop {max_len - len(self.enroll_df)} utterances from {max_len} "
                 f"(shorter than {enroll_segment} seconds)"
             )
+        self.padding_value = padding_value
+            
 
     def __len__(self) -> int:
         return len(self.df)
@@ -68,17 +69,25 @@ class SpeechDataset(torch.utils.data.Dataset):
         else:
             source = None
         mixture, sr = torchaudio.load(self.mixture_path)
+        if self.padding_value > 0:
+            mixture = self.get_padded_value(mixture)
+        
         std, mean = torch.std_mean(mixture, dim=-1)
         mixture = (mixture - mean)/std
         mixture = mixture[:, start:stop]
         source_speaker = int(row['index'])
         filtered = self.enroll_df.query('index == @source_speaker')
-        enroll_path = filtered.iloc[np.random.randint(0, len(filtered)-1)]['source']
+        enroll_path = filtered.iloc[np.random.randint(0, len(filtered))]['source']
         assert os.path.exists(enroll_path)
         enroll, sr = torchaudio.load(enroll_path)
         std, mean = torch.std_mean(enroll, dim=-1)
         enroll = (enroll - mean)/std
         return torch.t(mixture), torch.t(source), torch.t(enroll), source_speaker
+    
+    def get_padded_value(self, x):
+        v = self.padding_value - x.shape[-1] % self.padding_value
+        x = F.pad(x, pad=(1, v), value=0.)
+        return x
 
 # On-the-fly ミキシング
 class SpeechDatasetOTFMix(SpeechDataset):
@@ -86,8 +95,9 @@ class SpeechDatasetOTFMix(SpeechDataset):
                  mixing:dict, augment:dict,
                  sample_rate=16000,
                  segment=0,
+                 enroll_segment=0,
                  padding_value=0) -> None:
-        super().__init__(csv_path, enroll_csv_path, sample_rate=16000, segment=0)
+        super().__init__(csv_path, enroll_csv_path, sample_rate, segment, enroll_segment, padding_value)
         self.noise_df = pd.read_csv(noise_csv_path)
         self.min_snr=mixing['min_snr']
         self.max_snr=mixing['max_snr']
@@ -103,8 +113,6 @@ class SpeechDatasetOTFMix(SpeechDataset):
                                               source_loc=augment['reverb']['noise_loc'],
                                               loc_range=augment['reverb']['noise_loc_range'],
             )
-
-        self.padding_value = padding_value
         
     def rms(self, wave):
         return torch.sqrt(torch.mean(torch.square(wave)))
@@ -142,7 +150,8 @@ class SpeechDatasetOTFMix(SpeechDataset):
 
         source_speaker = int(row['index'])
         filtered = self.enroll_df.query('index == @source_speaker')
-        enroll_path = filtered.iloc[np.random.randint(0, len(filtered)-1)]['source']
+        assert len(filtered) > 0
+        enroll_path = filtered.iloc[np.random.randint(0, len(filtered))]['source']
         enroll, sr = torchaudio.load(enroll_path)
 
         noise_row = self.noise_df.iloc[np.random.randint(0, len(self.noise_df))]
@@ -151,8 +160,8 @@ class SpeechDatasetOTFMix(SpeechDataset):
             start = np.random.randint(0, row["length"] - self.seg_len)
             stop = start + self.seg_len
         else:
-            start = np.random.randint(0, row["length"] - len(source))
-            stop = start + len(source)
+            start = np.random.randint(0, row["length"] - source.shape[-1])
+            stop = start + source.shape[-1]
         if os.path.exists(noise_path):
             noise, sr = torchaudio.load(noise_path)
             noise = noise[:, start:stop]
@@ -171,7 +180,7 @@ class SpeechDatasetOTFMix(SpeechDataset):
 
         # opus encode/decode
         if self.opus:
-            mixture = self.opus(mixture)
+            mixture, _, _ = self.opus(mixture)
         # normalize
         std, mean = torch.std_mean(mixture, dim=-1)
         mixture = (mixture - mean)/std
@@ -181,11 +190,6 @@ class SpeechDatasetOTFMix(SpeechDataset):
         enroll = (enroll - mean)/std
 
         return torch.t(mixture), torch.t(source), torch.t(enroll), source_speaker
-
-    def get_padded_value(self, x):
-        v = self.padding_value - x.shape[-1] % self.padding_value
-        x = F.pad(x, pad=(1, v), value=0.)
-        return x
     
 def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Tensor, Tensor, list, list]:
     mixtures = []
@@ -238,3 +242,4 @@ if __name__ == '__main__':
     dataset = SpeechDatasetOTFMix(csv_path, noise_csv_path, enroll_csv_path, 
                  config['augment']['mixing'], 
                  config['augment'])
+    mixture, source, enroll, speaker = dataset.__getitem__(10)

@@ -1,10 +1,10 @@
 model_type: tasnet # tasnet/unet/unet2
 dataset:
   process:
-    batch_size: 2
+    batch_size: 16
     num_workers: 1
   segment:
-    segment: 20
+    segment: 0
     enroll_segment: 0
     sample_rate: 16000
   train:
@@ -22,7 +22,7 @@ dataset:
 augment:
   # on-the-fly mixing
   mixing:
-    min_snr: 10
+    min_snr: 0
     max_snr: 20
   opus:
     sample_rate: 16000

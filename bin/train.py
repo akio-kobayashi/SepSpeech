@@ -23,27 +23,23 @@ def main(config:dict, checkpoint_path=None):
 
     padding_value = model.get_padding_value()
     
-    train_dataset = SpeechDatasetOTFMix(csv_path=config['dataset']['train']['csv_path'],
-                                        noise_csv_path=config['dataset']['train']['noise_csv_path'],
-                                        enroll_csv_path=config['dataset']['train']['enroll_csv_path'],
-                                        mixing=config['augment']['mixing'],
-                                        augment=config['augment'],
-                                        sample_rate=config['dataset']['segment']['sample_rate'],
-                                        segment=config['dataset']['segment']['segment'],
-                                        padding_value=padding_value)
+    train_dataset = SpeechDataset(csv_path=config['dataset']['train']['csv_path'],
+                                  enroll_csv_path=config['dataset']['train']['enroll_csv_path'],
+                                  sample_rate=config['dataset']['segment']['sample_rate'],
+                                  segment=config['dataset']['segment']['segment'],
+                                  enroll_segment=config['dataset']['segment']['enroll_segment'],
+                                  padding_value=padding_value)
     train_loader = data.DataLoader(dataset=train_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,
                                    shuffle=True, 
                                    collate_fn=lambda x: conventional.speech_dataset.data_processing(x))
-    valid_dataset = SpeechDatasetOTFMix(csv_path=config['dataset']['valid']['csv_path'],
-                                        noise_csv_path=config['dataset']['valid']['noise_csv_path'],
-                                        enroll_csv_path=config['dataset']['valid']['enroll_csv_path'],
-                                        mixing=config['augment']['mixing'],
-                                        augment=config['augment'],
-                                        sample_rate=config['dataset']['segment']['sample_rate'],
-                                        segment=config['dataset']['segment']['segment'],
-                                        padding_value=padding_value)
+    valid_dataset = SpeechDataset(csv_path=config['dataset']['valid']['csv_path'],
+                                  enroll_csv_path=config['dataset']['valid']['enroll_csv_path'],
+                                  sample_rate=config['dataset']['segment']['sample_rate'],
+                                  segment=config['dataset']['segment']['segment'],
+                                  enroll_segment=config['dataset']['segment']['enroll_segment'],
+                                  padding_value=padding_value)
     valid_loader = data.DataLoader(dataset=valid_dataset,
                                    **config['dataset']['process'],
                                    pin_memory=True,

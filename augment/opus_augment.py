@@ -50,15 +50,21 @@ class OpusAugment(nn.Module):
         opus_decoder.set_channels(self.channels)
         #opus_decoder.set_sampling_frequency(self.samples_per_second)
         opus_decoder.set_sampling_frequency(target_samples_per_second)
-        
+
         #original_length = x.shape[-1] # (channels, length)
         wave_samples = x.cpu().detach().numpy().squeeze()
         wave_samples = np.array([ int(s*32768) for s in wave_samples]).astype(np.int16).tobytes()
 
         packet_loss_rate = np.random.rand() * (self.max_packet_loss_rate - self.min_packet_loss_rate) + self.min_packet_loss_rate
+        
         start, end = 0, self.desired_frame_size * self.bytes_per_sample
         decoded = []
-        fec = True if np.random.rand() < self.decode_missing_packet_rate else False
+        fec=False
+        if np.random.rand() < self.decode_missing_packet_rate:
+            fec=True
+
+        #print(f'bitrate: {bps}, sample rate: {target_samples_per_second}, packet loss: {packet_loss_rate:.3f}, FEC: {fec}')
+        
         while True:
             if start >= end:
                 break
@@ -76,7 +82,6 @@ class OpusAugment(nn.Module):
                 // self.bytes_per_sample
                 // self.channels
             )
-
             if effective_frame_size < self.desired_frame_size:
                 pcm += (
                     b"\x00"
@@ -86,8 +91,8 @@ class OpusAugment(nn.Module):
                 )
 
             encoded_packet = opus_encoder.encode(pcm)
-
-            if missing:
+            
+            if missing and start > 0:
                 if fec:
                     decoded_pcm = opus_decoder.decode_missing_packet(20)
                 else:
@@ -114,5 +119,5 @@ class OpusAugment(nn.Module):
             decoded_pcm = decoded_pcm[:, :original_length]
             
         #print(f'bitrate: {bps}, sample rate: {target_samples_per_second}, packet loss: {packet_loss_rate:.3f}, FEC: {fec}')
-        return decoded_pcm
+        return decoded_pcm, bps, target_samples_per_second
         
