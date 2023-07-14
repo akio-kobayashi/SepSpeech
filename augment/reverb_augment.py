@@ -68,4 +68,4 @@ class ReverbAugment(nn.Module):
         mx = torch.max(torch.abs(target), dim=-1).values
         target = target / mx * org_max
         
-        return target
+        return target, rt60

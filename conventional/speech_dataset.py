@@ -9,7 +9,7 @@ import pandas as pd
 from typing import Tuple
 from torch import Tensor
 import torchaudio
-from augment.opus_augment import OpusAugment
+from augment.opus_augment_simulate import OpusAugment
 from augment.reverb_augment import ReverbAugment
 
 '''
@@ -146,7 +146,7 @@ class SpeechDatasetOTFMix(SpeechDataset):
             
         reverb_source = None
         if self.source_reverb:
-            reverb_source = self.source_reverb(source)
+            reverb_source = self.source_reverb(source)[0]
 
         source_speaker = int(row['index'])
         filtered = self.enroll_df.query('index == @source_speaker')
@@ -169,7 +169,7 @@ class SpeechDatasetOTFMix(SpeechDataset):
             noise=None
         reverb_noise = None
         if self.noise_reverb:
-            reverb_noise = self.noise_reverb(noise)
+            reverb_noise = self.noise_reverb(noise)[0]
 
         # mixing
         snr = np.random.rand() * (self.max_snr-self.min_snr) + self.min_snr
@@ -180,7 +180,7 @@ class SpeechDatasetOTFMix(SpeechDataset):
 
         # opus encode/decode
         if self.opus:
-            mixture, _, _ = self.opus(mixture)
+            mixture = self.opus(mixture)[0]
         # normalize
         std, mean = torch.std_mean(mixture, dim=-1)
         mixture = (mixture - mean)/std
