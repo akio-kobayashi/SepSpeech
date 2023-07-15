@@ -243,3 +243,12 @@ if __name__ == '__main__':
                  config['augment']['mixing'], 
                  config['augment'])
     mixture, source, enroll, speaker = dataset.__getitem__(10)
+
+class SpeechDatasetCTC(SpeechDataset):
+    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, padding_value=0, tokenizer=None):
+        super.__init__(csv_path, enroll_path, sample_rate, segment, enroll_segment, padding_value)
+
+    def __getitem__(self, idx:int):
+        mixture, source, enroll, source_speaker = super.__getitem__(idx)
+        row = self.df.iloc[idx]
+        label_path = row['label']

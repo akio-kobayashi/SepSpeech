@@ -154,6 +154,8 @@ class UNet(nn.Module):
         self.resample = config['unet']['resample']
         self.depth = config['unet']['depth']
 
+        self.use_ctc= config['unet']['ctc']['use']
+
         in_channels=config['unet']['in_channels']
         mid_channels=config['unet']['mid_channels']
         out_channels=config['unet']['out_channels']
@@ -225,7 +227,11 @@ class UNet(nn.Module):
                                       config['unet']['num_speakers'])
         from models.speaker import SpeakerAdaptationLayer
         self.adpt = SpeakerAdaptationLayer(config['speaker']['adpt_type'])
-            
+
+        self.ctc_fc=None        
+        if self.use_ctc:
+            self.ctc_fc = nn.Linear(in_channels, config['unet']['output_class'])
+
     def valid_length(self, length):
         length = math.ceil(length * self.resample)
         for idx in range(self.depth):
@@ -234,6 +240,13 @@ class UNet(nn.Module):
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
         length = int(math.ceil(length/self.resample))
+        return int(length)
+    
+    def valid_length_encoder(self, length):
+        lengths = math.ceil(lengths  * self.resample)
+        for idx in range (self.depth):
+            length = math.ceil(length - self.kernel_size/self.stride) + 1
+            length = max(length, 1)
         return int(length)
     
     @property
@@ -280,6 +293,10 @@ class UNet(nn.Module):
             x = x.permute(0, 2, 1) # (b c t) -> (b t c)
             x = self.attention(x)
             x = x.permute(0, 2, 1) # (b t c) -> (b c t)
+        z = None
+        if self.use_ctc:
+            z = self.ctc_fc(x)
+
         #for decode, transform in zip(self.decoder, self.transform_d):
         for decode in self.decoder:
             skip = skips.pop(-1)
@@ -297,5 +314,5 @@ class UNet(nn.Module):
             x = downsample2(x)
         x = rearrange(x, 'b c t -> b (c t)')
         x = x[..., :length]
-        return std * x, y
+        return std * x, y, z
         

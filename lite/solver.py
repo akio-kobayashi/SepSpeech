@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 import torch.nn as nn
+import torch.nn.functional as F
 import pytorch_lightning as pl
 from models.unet import UNet
 from models.unet2 import UNet2
@@ -10,6 +11,7 @@ from loss.pesq_loss import PesqLoss
 from loss.sdr_loss import NegativeSISDR
 from loss.stoi_loss import NegSTOILoss
 from typing import Tuple
+from einops import rearrange
 
 '''
  PyTorch Lightning 用 solver
@@ -48,6 +50,11 @@ class LitSepSpeaker(pl.LightningModule):
         if config['loss']['sdr_loss']['use']:
             self.sdr_loss = NegativeSISDR()
             self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
+
+        self.ctc_loss=None
+        if config['model_type'] == 'unet' and config['unet']['ctc']['use']:
+            self.ctc_loss = nn.CTCLoss()
+            self.ctc_weight = config['unet']['ctc']['weight']
 
         self.save_hyperparameters()
 
@@ -109,10 +116,25 @@ class LitSepSpeaker(pl.LightningModule):
         return _loss
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
-        mixtures, sources, enrolls, lengths, speakers = batch
+        if self.ctc_loss is None:
+            mixtures, sources, enrolls, lengths, speakers = batch
+        else:
+            mixtures, sources, enrolls, lengths, speakers, labels, target_lengths = batch
 
-        src_hat, spk_hat = self.forward(mixtures, enrolls)
+        logits = None
+        if self.config['model_type'] == 'unet':
+            src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
+        else:
+            src_hat, spk_hat = self.forward(mixtures, enrolls)
         _loss = self.compute_loss(src_hat, sources, spk_hat, speakers)
+
+        if logits is not None:
+            valid_lengths = torch.tensor([ self.model.valid_length_encoder(l) for l in lengths ])
+            target_lengths = torch.tensor(target_lengths)
+            logprobs = F.log_softmax(logits)
+            logprobs = rearrange('b t c -> t b c')
+            with torch.cuda.amp.autocast('cuda', torch.float32):
+                _loss += self.ctc_weight * self.ctc_loss(logprobs, valid_lengths, target_lengths)
 
         return _loss
 
@@ -124,10 +146,19 @@ class LitSepSpeaker(pl.LightningModule):
     '''
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        mixtures, sources, enrolls, lengths, speakers = batch
+        if self.ctc_loss is None:
+            mixtures, sources, enrolls, lengths, speakers = batch
+        else:
+            mixtures, sources, enrolls, lengths, speakers, labels, target_lengths = batch
 
-        src_hat, spk_hat = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=True)
+        logits = None
+        if self.config['model_type'] == 'unet':
+            src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
+            if self.use_ctc:
+                valid_lengths = [ self.model.valid_length_encoder(l) for l in lengths ]
+        else:
+            src_hat, spk_hat = self.forward(mixtures, enrolls)
+        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers)
 
         return _loss
 
