@@ -25,9 +25,9 @@ class OpusAugment(nn.Module):
         self.desired_frame_duration = frame_duration/1000 # 20 msec
         #self.desired_frame_size = int(self.desired_frame_duration*self.samples_per_second)
 
-    def forward(self, x):
-
-        bps = np.random.randint(self.min_bps, self.max_bps)
+    def forward(self, x, bps=0, packet_loss_rate=-1, fec=True):
+        if bps == 0:
+            bps = np.random.randint(self.min_bps, self.max_bps)
         if bps < 12000:
             target_samples_per_second = 8000
         elif bps < 15000:
@@ -55,13 +55,16 @@ class OpusAugment(nn.Module):
         wave_samples = x.cpu().detach().numpy().squeeze()
         wave_samples = np.array([ int(s*32768) for s in wave_samples]).astype(np.int16).tobytes()
 
-        packet_loss_rate = np.random.rand() * (self.max_packet_loss_rate - self.min_packet_loss_rate) + self.min_packet_loss_rate
+        if packet_loss_rate < 0.0:
+            packet_loss_rate = np.random.rand() * (self.max_packet_loss_rate - self.min_packet_loss_rate) + self.min_packet_loss_rate
         
         start, end = 0, self.desired_frame_size * self.bytes_per_sample
         decoded = []
         fec=False
-        if np.random.rand() < self.decode_missing_packet_rate:
-            fec=True
+        #if packet_loss_rate < 0.0:
+        #    fec=False
+        #    if np.random.rand() < self.decode_missing_packet_rate:
+        #        fec=True
 
         #print(f'bitrate: {bps}, sample rate: {target_samples_per_second}, packet loss: {packet_loss_rate:.3f}, FEC: {fec}')
         
@@ -119,5 +122,5 @@ class OpusAugment(nn.Module):
             decoded_pcm = decoded_pcm[:, :original_length]
             
         #print(f'bitrate: {bps}, sample rate: {target_samples_per_second}, packet loss: {packet_loss_rate:.3f}, FEC: {fec}')
-        return decoded_pcm, bps, target_samples_per_second
+        return decoded_pcm, bps, packet_loss_rate, fec, target_samples_per_second
         

@@ -1,7 +1,7 @@
 import torch
 import torchaudio
 import numpy as np
-from augment.opus_augment import OpusAugment
+from augment.opus_augment_simulate import OpusAugment
 from augment.reverb_augment import ReverbAugment
 import argparse
 import yaml
@@ -57,11 +57,11 @@ if __name__ == '__main__':
     min_rt60, max_rt60 = reverb_noise_func.get_rt60s()
     rt60 = (max_rt60 - min_rt60) * np.random.rand() + min_rt60
 
-    reverb_noise = reverb_noise_func(noise, rt60)
-    reverb_source = reverb_source_func(source, rt60)
+    reverb_noise = reverb_noise_func(noise, rt60)[0]
+    reverb_source = reverb_source_func(source, rt60)[0]
 
     snr = np.random.rand() * (max_snr-min_snr) + min_snr
     mixture = mix(reverb_source, reverb_noise, snr)
     #mixture = mix(source, noise, snr)
-    mixture = opus_func(mixture)
-    torchaudio.save(filepath=args.output, src=mixture.to('cpu'), sample_rate=sr) # save as float
+    mixture = opus_func(mixture)[0]
+    torchaudio.save(filepath=args.output, src=mixture.to('cpu'), sample_rate=sr, encoding='PCM_S') # save as float

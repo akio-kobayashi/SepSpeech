@@ -25,7 +25,7 @@ class OpusAugment(nn.Module):
         self.bytes_per_sample = 2
         self.desired_frame_duration = frame_duration/1000 # 20 msec
 
-    def forward(self, x, bps=0, packet_loss_rate=-1):
+    def forward(self, x, bps=0, packet_loss_rate=-1, received=None):
         if bps == 0:
             bps = np.random.randint(self.min_bps, self.max_bps)
         if bps < 12000:
@@ -54,19 +54,20 @@ class OpusAugment(nn.Module):
 
         if packet_loss_rate < 0.0:
             packet_loss_rate = np.random.rand() * (self.max_packet_loss_rate - self.min_packet_loss_rate) + self.min_packet_loss_rate
-        
-        start, end = 0, self.desired_frame_size * self.bytes_per_sample
-        num_encoded_packets = 0
-        while True:
-            if start >= end:
-                break
-            start += self.desired_frame_size*self.bytes_per_sample
-            end += self.desired_frame_size*self.bytes_per_sample
-            if end >= len(wave_samples):
-                end = len(wave_samples)
-            num_encoded_packets += 1
-        model = GilbertElliotModel(plr=packet_loss_rate)
-        received = model.simulate(num_encoded_packets)
+
+        if received is None:
+            start, end = 0, self.desired_frame_size * self.bytes_per_sample
+            num_encoded_packets = 0
+            while True:
+                if start >= end:
+                    break
+                start += self.desired_frame_size*self.bytes_per_sample
+                end += self.desired_frame_size*self.bytes_per_sample
+                if end >= len(wave_samples):
+                    end = len(wave_samples)
+                    num_encoded_packets += 1
+            model = GilbertElliotModel(plr=packet_loss_rate)
+            received = model.simulate(num_encoded_packets)
 
         start, end = 0, self.desired_frame_size * self.bytes_per_sample
         num_encoded_packets = 0
@@ -117,5 +118,5 @@ class OpusAugment(nn.Module):
             decoded_pcm = decoded_pcm[:, :original_length]
             
         #print(f'bitrate: {bps}, sample rate: {target_samples_per_second}, packet loss: {packet_loss_rate:.3f}')
-        return decoded_pcm, bps, packet_loss_rate, target_samples_per_second
+        return decoded_pcm, bps, packet_loss_rate, target_samples_per_second, received
         

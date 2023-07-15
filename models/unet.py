@@ -273,13 +273,13 @@ class UNet(nn.Module):
                 x = self.adpt(x, enc_s)
             skips.append(x)
         if self.lstm is not None:
-            x = x.permute(2, 0, 1)
+            x = x.permute(2, 0, 1) # (b c t) -> (t b c)
             x, _ = self.lstm(x)
-            x = x.permute(1, 2, 0)
+            x = x.permute(1, 2, 0) # (t b c) -> (b c t)
         else:
-            x = x.permute(0, 2, 1)
+            x = x.permute(0, 2, 1) # (b c t) -> (b t c)
             x = self.attention(x)
-            x = x.permute(0, 2, 1)
+            x = x.permute(0, 2, 1) # (b t c) -> (b c t)
         #for decode, transform in zip(self.decoder, self.transform_d):
         for decode in self.decoder:
             skip = skips.pop(-1)
