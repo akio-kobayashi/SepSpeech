@@ -14,9 +14,13 @@ RUN apt-get install -y cython3 ffmpeg
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 RUN pip3 install torchmetrics lightning einops numpy sklearn tqdm pandas scipy numba h5py seaborn wave librosa
 RUN pip3 install tensorboard
-RUN pip3 install torchmetrics[audio] ffmpeg pesq
+RUN pip3 install torchmetrics[audio] ffmpeg pesq webrtcvad
 ARG GIT_VERSION=2.38.0
 RUN apt-get install -y gettext libcurl4-gnutls-dev libexpat1-dev libghc-zlib-dev libssl-dev make wget
 RUN wget https://github.com/git/git/archive/v${GIT_VERSION}.tar.gz && tar -xzf v${GIT_VERSION}.tar.gz \
     && cd git-* && make prefix=/usr/local all && make prefix=/usr/local install
 RUN pip3 install git+https://github.com/openai/whisper.git
+RUN pip3 install git+https://github.com/r9y9/pyopenjtalk.git --no-build-isolation
+COPY test.py /usr/local/bin/
+RUN python3 /usr/local/bin/test.py
+RUN rm -f /usr/local/bin/test.py
