@@ -15,6 +15,7 @@ RUN pip3 install torch torchvision torchaudio --index-url https://download.pytor
 RUN pip3 install torchmetrics lightning einops numpy sklearn tqdm pandas scipy numba h5py seaborn wave librosa
 RUN pip3 install tensorboard
 RUN pip3 install torchmetrics[audio] ffmpeg pesq webrtcvad
+RUN pip3 install transformers
 ARG GIT_VERSION=2.38.0
 RUN apt-get install -y gettext libcurl4-gnutls-dev libexpat1-dev libghc-zlib-dev libssl-dev make wget
 RUN wget https://github.com/git/git/archive/v${GIT_VERSION}.tar.gz && tar -xzf v${GIT_VERSION}.tar.gz \

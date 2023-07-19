@@ -25,30 +25,30 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     decoder = whisper.load_model("large").to(device)
     df = pd.read_csv(args.input_csv)
-    df_out = pd.Dataframe(columns=['key', 'source', 'length', 'text'])
-    _key, _source, _length, _text = {}, {}, {}, {}
+    df_out = pd.Dataframe(columns=['key', 'clean', 'noisy', 'length', 'decode'])
+    _key, _source, _length, _decode = {}, {}, {}, {}
     with torch.no_grad():
         for [index, row] in df.iterrows():
-            source = row['source']
+            clean = row['clean']
             length = row['length']
             decoded = decoder.transcribe(source, verbose=False, language='ja')
             key = os.path.basename(_source).splitext()[0]
-            clean_decoded.append(decoded['text'])
 
             _key.append(key)
             _source.append(source)
             _length.append(length)
-            _text.append(decoded['text'])
+            _decode.append(decoded['text'])
+            
     df_out['key'] = _key
     df_out['length'] = _length
     df_out['source'] = _source
-    df_out['text'] = _text
+    df_out['decode'] = _decode
     df_out.to_csv(args.output_csv, index=False)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--input_csv', type=str)
-    parser.add_argument('--output_csv', type=str)
+    parser.add_argument('--input-csv', type=str)
+    parser.add_argument('--output-csv', type=str)
     args = parser.parse_args()
 
     main(args)
