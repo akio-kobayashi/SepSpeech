@@ -1,0 +1,99 @@
+model_type: unet
+# dataset
+dataset:
+  process:
+    batch_size: 16
+    num_workers: 2
+  segment:
+    segment: 20
+    sample_rate: 16000
+  train:
+    csv_path: 'audio/csv/train.csv'
+  valid:  
+    csv_path: 'audio/csv/valid.csv'
+  test:
+    csv_path: 
+# trainer parameters
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 200
+  precision: '16-mixed'
+  profiler: 'simple'
+  gradient_clip_val: 5.
+optimizer:
+  lr: 1.e-4
+logger:
+  save_dir: './'
+  version: 6
+  name: 'lightning_logs'
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_top_k: 1
+  mode: 'min'
+  every_n_epochs: 1
+# training parameters
+tasnet:
+  kernel_size: 20
+  in_channels: 256
+  enc_channels: 256
+  conv_channels: 512
+  num_blocks: 6
+  block_kernel_size: 3
+  num_repeats: 4
+  resample: 1
+unet:
+  attention: True
+  normalize: False #True
+  floor: 0.001
+  resample: 2
+  depth: 5
+  in_channels: 1
+  mid_channels: 256 #512 #48
+  out_channels: 1
+  max_channels: 10000
+  kernel_size: 8
+  growth: 1 #2
+  rescale: 0.1
+  stride: 4
+  reference: 0.1
+  causal: True
+augment:
+  white_noise:
+    use: true
+    min_snr: 0
+    max_snr: 20
+    fix_snr: False
+  narrow_band:
+    use: true
+    min_snr: 0
+    max_snr: 10
+    fix_snr: False
+    min_central_freq: 200
+    max_central_freq: 6000
+    min_Q: 50.0
+    max_Q: 100.0
+    fix_params: False
+  fading:
+    use: true
+    scaler: 10
+    min_velocity: 50.
+    max_velocity: 5000.
+    center_freq: 500e3
+    num_sinusoids: 20
+loss:
+  stft:
+    use: true
+    weight: 1.0
+  sdr:
+    use: false
+    weight: 0.1
+  stoi:
+    use: false
+    weight: 0.1
+    extended: true
+  pesq:
+    use: true
+    weight: 2.0
+    

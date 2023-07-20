@@ -25,14 +25,14 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
     decoder = whisper.load_model("large").to(device)
     df = pd.read_csv(args.input_csv)
-    df_out = pd.Dataframe(columns=['key', 'clean', 'noisy', 'length', 'decode'])
-    _key, _source, _length, _decode = {}, {}, {}, {}
+    df_out = pd.DataFrame(columns=['key', 'clean', 'noisy', 'length', 'decode'])
+    _key, _source, _length, _decode = [], [], [], []
     with torch.no_grad():
         for [index, row] in df.iterrows():
-            clean = row['clean']
+            source = row['clean']
             length = row['length']
             decoded = decoder.transcribe(source, verbose=False, language='ja')
-            key = os.path.basename(_source).splitext()[0]
+            key = os.path.splitext(os.path.basename(source))[0]
 
             _key.append(key)
             _source.append(source)

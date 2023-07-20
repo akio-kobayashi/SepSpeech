@@ -1,6 +1,7 @@
 #!/bin/sh
 
-for version in 1 2 3 4;do
+#for version in 1 2 3 4;do
+for version in 5;do
     #version=4
     config=lightning_logs/version_${version}/hparams.yaml
     if [[ $version == 1 ]]; then
@@ -11,6 +12,8 @@ for version in 1 2 3 4;do
 	checkpoint=lightning_logs/version_${version}/checkpoints/checkpoint_epoch=159-step=192800-valid_loss=0.053.ckpt
     elif [[ $version == 4 ]]; then
 	checkpoint=lightning_logs/version_${version}/checkpoints/checkpoint_epoch=153-step=185570-valid_loss=0.044.ckpt
+    elif [[ $version == 5 ]];then
+	checkpoint=lightning_logs/version_${version}/checkpoints/checkpoint_epoch=184-step=222925-valid_loss=2.600.ckpt
     fi
     echo $checkpoint
     #config=radio.yaml
