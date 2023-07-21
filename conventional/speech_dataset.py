@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, List
 from torch import Tensor
 import torchaudio
 from augment.opus_augment_simulate import OpusAugment
@@ -48,7 +48,6 @@ class SpeechDataset(torch.utils.data.Dataset):
                 f"(shorter than {enroll_segment} seconds)"
             )
         self.padding_value = padding_value
-            
 
     def __len__(self) -> int:
         return len(self.df)
@@ -191,7 +190,7 @@ class SpeechDatasetOTFMix(SpeechDataset):
 
         return torch.t(mixture), torch.t(source), torch.t(enroll), source_speaker
     
-def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Tensor, Tensor, list, list]:
+def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Tensor, Tensor, List, List]:
     mixtures = []
     sources = []
     enrolls = []
@@ -247,8 +246,55 @@ if __name__ == '__main__':
 class SpeechDatasetCTC(SpeechDataset):
     def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, padding_value=0, tokenizer=None):
         super.__init__(csv_path, enroll_path, sample_rate, segment, enroll_segment, padding_value)
-
+        self.tokenizer = tokenizer
+        
     def __getitem__(self, idx:int):
         mixture, source, enroll, source_speaker = super.__getitem__(idx)
         row = self.df.iloc[idx]
         label_path = row['label']
+        with open(label_path, 'r') as f:
+            line = f.readline().strip()
+            label = self.tokenizer.text2token(line) # List[int]
+
+        return mixture, source, enroll, source_speaker, label
+
+def data_processing_ctc(data:Tuple[Tensor,Tensor,Tensor,int, List]) -> Tuple[Tensor, Tensor, Tensor, list, list, Tensor, list]:
+    mixtures = []
+    sources = []
+    enrolls = []
+    lengths = []
+    speakers = []
+    labels = []
+    label_legnths = []
+
+    for mixture, source, enroll, speaker in data:
+        # w/o channel
+        mixtures.append(mixture)
+        if source is not None:
+            sources.append(source)
+        enrolls.append(enroll)
+        lengths.append(len(mixture))
+        #speakers.append(torch.from_numpy(speaker.astype(np.int)).clone())
+        speakers.append(speaker)
+
+        label_lengths.append(len(label))
+        labels.append(torch.from_numpy(label))
+        
+    mixtures = nn.utils.rnn.pad_sequence(mixtures, batch_first=True)
+    if len(sources) > 0:
+        sources = nn.utils.rnn.pad_sequence(sources, batch_first=True)
+    enrolls = nn.utils.rnn.pad_sequence(enrolls, batch_first=True)
+    speakers = torch.from_numpy(np.array(speakers)).clone()
+
+    labels = nn.utils.rnn.pad_sequence(labels, batch_first=True)
+    
+    mixtures = mixtures.squeeze()
+    sources = sources.squeeze()
+    enrolls = enrolls.squeeze()
+
+    if mixtures.dim() == 1:
+        mixtures = mixtures.unsqueeze(0)
+        sources = sources.unsqueeze(0)
+        enrolls = enrolls.unsqueeze(0)
+        
+    return mixtures, sources, enrolls, lengths, speakers, labels, label_lengths

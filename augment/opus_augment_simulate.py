@@ -65,7 +65,7 @@ class OpusAugment(nn.Module):
                 end += self.desired_frame_size*self.bytes_per_sample
                 if end >= len(wave_samples):
                     end = len(wave_samples)
-                    num_encoded_packets += 1
+                num_encoded_packets += 1
             model = GilbertElliotModel(plr=packet_loss_rate)
             received = model.simulate(num_encoded_packets)
 

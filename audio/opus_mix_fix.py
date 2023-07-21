@@ -118,9 +118,10 @@ def main(args):
             markov_states = np.load(row['markov_states'])
         mixture, bps, packet_loss_rate, resample, markov_states = opus_func(mixture, bps, packet_loss_rate, markov_states)
         markov_states=np.array(markov_states)
-        markov_states_path = os.path.join(args.out_dir,
+        markov_states_path = os.path.join(args.output_dir,
                                           os.path.splitext(os.path.basename(source_path))[0])+'.npy'
         np.save(markov_states_path, markov_states)
+        mix_list['markov_states'].append(markov_states_path)
         torchaudio.save(filepath=mix_path, src=mixture.to('cpu'), sample_rate=sr) # save as float
         
         mix_list['mixture'].append(mix_path)

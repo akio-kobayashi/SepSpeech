@@ -1,18 +1,18 @@
-model_type: tasnet # tasnet/unet/unet2
+model_type: unet # tasnet/unet/unet2
 dataset:
   process:
-    batch_size: 16
+    batch_size: 8
     num_workers: 1
   segment:
     segment: 0
     enroll_segment: 0
     sample_rate: 16000
   train:
-    csv_path: 'audio/csv/jnas_train.csv'
+    csv_path: 'audio/csv/mix_train.csv'
     enroll_csv_path: 'audio/csv/jnas_enroll.csv'
     noise_csv_path: 'audio/csv/noise_train.csv' # on-the-fly mixing
   valid:  
-    csv_path: 'audio/csv/jnas_valid.csv'
+    csv_path: 'audio/csv/mix_valid.csv'
     enroll_csv_path: 'audio/csv/jnas_enroll.csv'
     noise_csv_path: 'audio/csv/noise_valid.csv'
   test:
@@ -75,7 +75,7 @@ optimizer:
   lr: 1.e-4
 logger:
   save_dir: './'
-  version: 1
+  version: 3
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
@@ -128,3 +128,11 @@ unet: #unet/unet2
   reference: 0.1
   causal: True
   num_speakers: 307
+  ctc:
+    use: False
+    weight: 1.0
+sepformer:
+  channels: 256
+  kernel_size: 16
+  stride: 8
+  

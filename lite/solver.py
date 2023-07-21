@@ -29,9 +29,6 @@ class LitSepSpeaker(pl.LightningModule):
         else:
             raise ValueError('wrong parameter: '+config['model_type'])
 
-        #self.lambda1 = config['loss']['lambda1']
-        #self.lambda2 = config['loss']['lambda2']
-
         self.ce_loss = nn.CrossEntropyLoss(reduction='sum')
         self.ce_loss_weight = config['loss']['ce_loss']['weight']
         
@@ -59,7 +56,7 @@ class LitSepSpeaker(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, mix:Tensor, enr:Tensor) -> Tuple[Tensor, Tensor]:
-        return self.model(mix, enr)
+        return self.model(mix, enr) # est, est_spk, ctc
 
     def compute_loss(self, estimate, target, estimate_spk, target_spk, valid=False):
         d = {}
@@ -125,8 +122,8 @@ class LitSepSpeaker(pl.LightningModule):
         if self.config['model_type'] == 'unet':
             src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
         else:
-            src_hat, spk_hat = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers)
+            src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
+        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=False)
 
         if logits is not None:
             valid_lengths = torch.tensor([ self.model.valid_length_encoder(l) for l in lengths ])
@@ -154,11 +151,11 @@ class LitSepSpeaker(pl.LightningModule):
         logits = None
         if self.config['model_type'] == 'unet':
             src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
-            if self.use_ctc:
+            if self.ctc_loss is not None:
                 valid_lengths = [ self.model.valid_length_encoder(l) for l in lengths ]
         else:
-            src_hat, spk_hat = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers)
+            src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
+        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=True)
 
         return _loss
 
@@ -185,7 +182,7 @@ class LitSepSpeaker(pl.LightningModule):
         with torch.no_grad():
             for n in range(1000, 1100):
                 x = torch.rand(4, n)
-                o, _ = self.model(x.cuda(), s)
+                o, _, _ = self.model(x.cuda(), s)
                 if x.shape[-1] == o.shape[-1]:
                     if start < 0:
                         start = n
