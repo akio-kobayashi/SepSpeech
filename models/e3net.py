@@ -14,7 +14,7 @@ from einops import rearrange
     Encoder 
 '''
 class LearnableEncoder(nn.Module):
-    def __init__(self, chin:int, chout:int, kernel_size:int, stride:int) -> None:
+    def __init__(self, chin=1, chout=2048, kernel_size=400, stride=160) -> None:
         super().__init__()
         self.encoder = nn.Conv1d(chin, chout, kernel_size, stride)
     
@@ -22,7 +22,7 @@ class LearnableEncoder(nn.Module):
         return self.encoder(x)
     
 class LearnableDecoder(nn.Module):
-    def __init__(self, chin:int, chout:int, kernel_size:int, stride:int) -> None:
+    def __init__(self, chin=2048, chout=1, kernel_size=400, stride=160) -> None:
         super().__init__()
         self.decoder = nn.ConvTranspose1d(chin, chout, kernel_size, stride)
 
@@ -30,7 +30,7 @@ class LearnableDecoder(nn.Module):
         return self.decoder(x)
 
 class LSTMBlock(nn.Module):
-    def __init__(self, dim=1023, eps=1.e-8):
+    def __init__(self, dim=1024, hidden_dim=256, eps=1.e-8):
         super().__init__()
         self.block = nn.Sequential(
             nn.Linear(dim, dim),
@@ -41,8 +41,9 @@ class LSTMBlock(nn.Module):
         )
         self.lstm = nn.LSTM(bidirectional=False,
                             num_layers=1,
-                            hidden_size=dim,
-                            input_size=dim)
+                            hidden_size=hidden_dim,
+                            input_size=dim,
+                            proj_size=dim)
         self.norm1 = nn.LayerNorm(dim, eps=eps)
         self.norm2 = nn.LayerNorm(dim, eps=eps)
 
@@ -57,10 +58,10 @@ class LSTMBlock(nn.Module):
         return self.norm2(x)
 
 class SpeakerBlock(nn.Module):
-    def __init__(self, chin=1023, chout=256, kernel_size=3, num_speakers=1000):
+    def __init__(self, chin=2048, chout=256, kernel_size=3, num_speakers=1000):
         super().__init__()
         self.conv = nn.Conv1d(
-            chin,      # 1023
+            chin,      # 2048
             chout,     # 256
             kernel_size,      # 16
             1,
@@ -76,15 +77,15 @@ class SpeakerBlock(nn.Module):
         return s
 
 class FeatureConcatBlock(nn.Module):
-    def __init__(self, x_dim=1023, s_dim=256, eps=1.e-8):
+    def __init__(self, x_dim=2048, s_dim=256, output_dim=1024, eps=1.e-8):
         super().__init__()
         
         self.pre = nn.Sequential(nn.PReLU(),
                                  nn.LayerNorm(x_dim, eps=eps)
                                 )
-        self.post = nn.Sequential(nn.Linear(x_dim+s_dim, x_dim),
+        self.post = nn.Sequential(nn.Linear(x_dim+s_dim, output_dim),
                                   nn.PReLU(),
-                                  nn.LayerNorm(x_dim, eps=eps)
+                                  nn.LayerNorm(output_dim, eps=eps)
                                   )
         
     def forward(self, x:Tensor, s:Tensor):
@@ -96,21 +97,30 @@ class FeatureConcatBlock(nn.Module):
 
         return y
 
+class MaskingBlock(nn.Module):
+    def __init__(self, x_dim=1024, output_dim=2048):
+        self.pre = nn.Sequential(nn.Linear(x_dim, output_dim),
+                                 nn.Sigmoid()
+        )
+    def forward(self, src, mask):
+        mask = self.pre(mask)
+        return src*mask
+    
 class E3Net(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.depth = 1
+        self.depth = 4
 
-        self.encoder = LearnableEncoder(chin=1, chout=1023, kernel_size=400, stride=160)
+        self.encoder = LearnableEncoder()
+        self.speaker_block = SpeakerBlock()
+        self.concate_block = FeatureConcatBlock()
 
-        self.speaker_block = SpeakerBlock(in_channels=1023, out_channels=256, kernel_size=16, num_speakers=1000)
+        self.lstm_block=nn.ModuleList()
+        for _ in self.depth:
+         self.lstm_block.append(LSTMBlock())
 
-        self.lstm_block = LSTMBlock(dim=1023)
-
-        self.final_block = nn.Sequential(
-
-        )
-        self.decoder = LearnableDecoder(chin=1023, chout=1, kernel_size=400, stride=160)
+        self.masking_block = MaskingBlock()
+        self.decoder = LearnableDecoder()
 
     def valid_length(self, length):
         #length = math.ceil(length * self.resample)
@@ -124,17 +134,37 @@ class E3Net(nn.Module):
         return length
 
     def forward(self, x:Tensor, s:Tensor):
-        _, _ = x.shape # (B, T)
-        x = x.unsqueeze(1)
-
+        _, orig_length = x.shape
+        x = x.unsqueeze(1) # B, T -> B, 1, T
         # encoder
-        x = self.encoder(x)
+        x = self.encoder(x) # B, C, T
         # speaker block
+        s = self.speaker_block(s)
+
+        y = rearrange(x, 'b c t -> b t c')
+        y = self.concate_block(y, s)
 
         # lstm block
+        y = self.lstm_block(y)
 
-        # final block
+        # masking
+        y = self.masking_block(x, y)
 
         # decoder block 
-        return self.decoder(x)
+        y = rearrange(y, 'b t c -> b c t')
+        y = self.decoder(y)
+        y = rearrange(y, 'b c t -> b (c t)')
+
+        return y[:, :orig_length]
+
+if __name__ == '__main__':
+    with open("../config.yaml", 'r') as yf:
+        config = yaml.safe_load(yf)
+
+    model = E3Net(config)
+    x = torch.rand(4, 65536)
+    s = torch.rand(4, 65536)
+    y = model(x, s)
+    print(x.shape)
+    print(y.shape)
     
