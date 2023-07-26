@@ -4,7 +4,7 @@ import logging
 import sys, os
 from torchmetrics.audio.pesq import PerceptualEvaluationSpeechQuality
 from torchmetrics.audio.stoi import ShortTimeObjectiveIntelligibility
-from torchmetrics import ScaleInvariantSignalDistortionRatio
+from torchmetrics.audio import ScaleInvariantSignalDistortionRatio
 import torch
 import torch.nn.functional as F
 import torchaudio
