@@ -26,7 +26,7 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
 
-    decoder = whisper.load_model("large").to(device)
+    decoder = whisper.load_model("large-v2").to(device)
 
     df_out = pd.DataFrame(index=None, 
                           columns=['key', 'source', 'source_result'])

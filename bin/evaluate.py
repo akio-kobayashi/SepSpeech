@@ -24,7 +24,7 @@ def get_divisor(model):
     with torch.no_grad():
         for n in range(1000, 1100):
             x = torch.rand(4, n)
-            o,_ = model(x.cuda(), s.cuda())
+            o, _, _ = model(x.cuda(), s.cuda())
             if x.shape[-1] == o.shape[-1] :
                 if start < 0:
                     start = n
@@ -45,7 +45,7 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
 
-    decoder = whisper.load_model("large").to(device)
+    decoder = whisper.load_model("large-v2").to(device)
 
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
@@ -54,7 +54,9 @@ def main(args):
     assert args.checkpoint is not None
     model = LitSepSpeaker.load_from_checkpoint(args.checkpoint,
                                                config=config).to(device)
-    divisor = get_divisor(model)
+    divisor=0
+    if args.model_type == 'tasnet':
+        divisor = get_divisor(model)
     model.eval()
     
     sample_rate = config['dataset']['segment']['sample_rate']
@@ -104,7 +106,7 @@ def main(args):
             if divisor > 0 and mixture_original_length % divisor > 0:
                 mixture = padding(mixture, divisor)
 
-            estimate, _ = model(mixture.to(device), enroll.to(device))
+            estimate, _, _ = model(mixture.to(device), enroll.to(device))
             estimate = estimate[:, :mixture_original_length]
             estimate *= mix_std
             est_pesq.append(_pesq(estimate.cuda(), source.cuda()).cpu().detach().numpy())

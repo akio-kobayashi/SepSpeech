@@ -75,11 +75,12 @@ optimizer:
   lr: 1.e-4
 logger:
   save_dir: './'
-  version: 3
+  version: 6
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
   filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_last: True
   save_top_k: 1
   mode: 'min'
   every_n_epochs: 1
