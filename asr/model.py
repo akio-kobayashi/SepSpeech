@@ -26,11 +26,11 @@ class Sequence():
             self.k = seq.k[:]
             self.h = seq.h
             self.logp = seq.logp
-        self.transform=PhoneTransform()
+        #self.transform=PhoneTransform()
 
-    def __str__(self):
-        #print(self.k)
-        return 'Prediction: {}\nlog-likelihood {:.2f}\n'.format(self.transform.int_to_text(self.k), -self.logp)
+    #def __str__(self):
+    #    #print(self.k)
+    #    return 'Prediction: {}\nlog-likelihood {:.2f}\n'.format(self.transform.int_to_text(self.k), -self.logp)
                
 class Subsampler(nn.Module):
     def __init__(self):
@@ -237,7 +237,7 @@ class Transducer(nn.Module):
 
 
     def beam_search(self, xs, W=10, ff=True, prefix=False):
-        if ff is True
+        if ff is True:
             if self.downsampler is not None:
                 xs = self.downsampler(xs)
                 xs = self.encoder(xs)
