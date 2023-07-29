@@ -25,7 +25,7 @@ optimizer:
   lr: 1.e-4
 logger:
   save_dir: './'
-  version: 6
+  version: 7
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
@@ -61,12 +61,12 @@ unet:
   causal: True
 augment:
   white_noise:
-    use: true
+    use: false
     min_snr: 0
     max_snr: 20
     fix_snr: False
   narrow_band:
-    use: true
+    use: false
     min_snr: 0
     max_snr: 10
     fix_snr: False
@@ -94,6 +94,6 @@ loss:
     weight: 0.1
     extended: true
   pesq:
-    use: true
+    use: false
     weight: 2.0
     

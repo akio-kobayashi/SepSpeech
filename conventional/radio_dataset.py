@@ -98,7 +98,7 @@ class RadioDataset(torch.utils.data.Dataset):
             if self.white_noise is not None:
                 noise = self.white_noise(source)
             else:
-                noise = torch.zero_like(source)
+                noise = torch.zeros_like(source)
             if self.narrow_band is not None:
                 noise += self.narrow_band(source)
 
