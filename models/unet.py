@@ -9,6 +9,7 @@ import torch.nn as nn
 from torch import Tensor
 import math
 from einops import rearrange
+from models.ctc import CTCBlock
 
 class TFEncoder(nn.Module):
     def __init__(self, dim, n_layers=5, n_heads=8):
@@ -154,8 +155,6 @@ class UNet(nn.Module):
         self.resample = config['unet']['resample']
         self.depth = config['unet']['depth']
 
-        self.use_ctc= config['unet']['ctc']['use']
-
         in_channels=config['unet']['in_channels']
         mid_channels=config['unet']['mid_channels']
         out_channels=config['unet']['out_channels']
@@ -228,9 +227,9 @@ class UNet(nn.Module):
         from models.speaker import SpeakerAdaptationLayer
         self.adpt = SpeakerAdaptationLayer(config['speaker']['adpt_type'])
 
-        self.ctc_fc=None        
-        if self.use_ctc:
-            self.ctc_fc = nn.Linear(in_channels, config['unet']['output_class'])
+        self.ctc_block=None        
+        if config['ctc']['use']:
+            self.ctc_block = CTCBlock(config['ctc']['parameters'])
 
     def valid_length(self, length):
         length = math.ceil(length * self.resample)
@@ -242,11 +241,9 @@ class UNet(nn.Module):
         length = int(math.ceil(length/self.resample))
         return int(length)
     
-    def valid_length_encoder(self, length):
-        lengths = math.ceil(lengths  * self.resample)
-        for idx in range (self.depth):
-            length = math.ceil(length - self.kernel_size/self.stride) + 1
-            length = max(length, 1)
+    def valid_length_ctc(self, length):
+        length = self.valid_length(length)
+        length = self.ctc_block.valid_length(length)
         return int(length)
     
     @property
@@ -293,9 +290,6 @@ class UNet(nn.Module):
             x = x.permute(0, 2, 1) # (b c t) -> (b t c)
             x = self.attention(x)
             x = x.permute(0, 2, 1) # (b t c) -> (b c t)
-        z = None
-        if self.use_ctc:
-            z = self.ctc_fc(x)
 
         #for decode, transform in zip(self.decoder, self.transform_d):
         for decode in self.decoder:
@@ -307,6 +301,11 @@ class UNet(nn.Module):
             #    x = rearrange(x, 'b t c -> b c t')
             #    x = self.adpt(x, enc_s)
             x = decode(x)
+
+        z = None
+        if self.ctc_block is not None:
+            z = self.ctc_block(x)
+            
         if self.resample == 2:
             x = downsample2(x)
         elif self.resample == 4:

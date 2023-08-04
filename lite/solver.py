@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 from models.unet import UNet
 from models.unet2 import UNet2
 from models.conv_tasnet import ConvTasNet
+from models.e3net import E3Net
 from loss.stft_loss import MultiResolutionSTFTLoss
 from loss.pesq_loss import PesqLoss
 from loss.sdr_loss import NegativeSISDR
@@ -26,6 +27,8 @@ class LitSepSpeaker(pl.LightningModule):
             self.model = UNet2(config)
         elif config['model_type'] == 'tasnet':
             self.model = ConvTasNet(config)
+        elif config['model_type'] == 'e3net':
+            self.model = E3Net(config['e3net'])
         else:
             raise ValueError('wrong parameter: '+config['model_type'])
 
@@ -49,9 +52,9 @@ class LitSepSpeaker(pl.LightningModule):
             self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
 
         self.ctc_loss=None
-        if config['model_type'] == 'unet' and config['unet']['ctc']['use']:
+        if config['ctc']['use']:
             self.ctc_loss = nn.CTCLoss()
-            self.ctc_weight = config['unet']['ctc']['weight']
+            self.ctc_weight = config['ctc']['weight']
 
         self.save_hyperparameters()
 
@@ -126,7 +129,7 @@ class LitSepSpeaker(pl.LightningModule):
         _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=False)
 
         if logits is not None:
-            valid_lengths = torch.tensor([ self.model.valid_length_encoder(l) for l in lengths ])
+            valid_lengths = torch.tensor([ self.model.valid_length_ctc(l) for l in lengths ])
             target_lengths = torch.tensor(target_lengths)
             logprobs = F.log_softmax(logits)
             logprobs = rearrange('b t c -> t b c')
@@ -152,7 +155,7 @@ class LitSepSpeaker(pl.LightningModule):
         if self.config['model_type'] == 'unet':
             src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
             if self.ctc_loss is not None:
-                valid_lengths = [ self.model.valid_length_encoder(l) for l in lengths ]
+                valid_lengths = [ self.model.valid_length_ctc(l) for l in lengths ]
         else:
             src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
         _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=True)
@@ -173,20 +176,3 @@ class LitSepSpeaker(pl.LightningModule):
     
     def get_model(self):
         return self.model
-
-    def get_padding_value(self):
-        self.model.cuda()
-        start = -1
-        end = -1
-        s = torch.rand(4, 1000).cuda()
-        with torch.no_grad():
-            for n in range(1000, 1100):
-                x = torch.rand(4, n)
-                o, _, _ = self.model(x.cuda(), s)
-                if x.shape[-1] == o.shape[-1]:
-                    if start < 0:
-                        start = n
-                    else:
-                        end = n
-                        break
-        return end - start

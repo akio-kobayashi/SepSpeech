@@ -291,6 +291,9 @@ class ConvTasNet(nn.Module):
         
         self.resample = config['tasnet']['resample']
 
+        self.padding_value = 0
+        self.get_padding_value()
+
     def _build_blocks(self, num_blocks, **block_kwargs):
         """
         Build Conv1D block
@@ -341,8 +344,12 @@ class ConvTasNet(nn.Module):
         if x.dim() == 1:
             x = torch.unsqueeze(x, 0)
 
-        # updample
+        # padding
+        _, input_length = x.shape
+        if self.padding_value>0:
+            x = self.get_padded_value(x)
         #x = F.pad(x, (0, self.valid_length(x.shape[-1]) - x.shape[-1]))
+        # upsample
         #x = self.upsample(x)
 
         # n x 1 x S => n x N x T
@@ -368,34 +375,38 @@ class ConvTasNet(nn.Module):
             out = torch.unsqueeze(out, 0)
         # downsample
         #out = self.downsample(out)
-        
-        # spks x n x S
-        return out, z
 
+        # chopping
+        _, output_length = out.shape
+        #assert output_length >= input_length
+        start = (output_length - input_length)//2
+        out = out[:, start:start+input_length]
+        # spks x n x S
+        return out, z, None # dummy
+    
+    def get_padding_value(self):
+        start = -1
+        end = -1
+        s = torch.rand(4, 1000)
+        with torch.no_grad():
+            for n in range(1000, 1100):
+                x = torch.rand(4, n)
+                o, _, _ = self.forward(x, s)
+                if x.shape[-1] == o.shape[-1]:
+                    if start < 0:
+                        start = n
+                    else:
+                        end = n
+                        break
+        self.padding_value = end - start
+
+    def get_padded_value(self, x):
+        v = self.padding_value - x.shape[-1] % self.padding_value
+        x = torch.nn.functional.pad(x, pad=(1, v), value=0.)
+        return x
+        
 def count_parameters(model):
     return sum(param.numel() for param in model.parameters() if param.requires_grad)
-
-'''
-def foo_conv1d_block():
-    nnet = Conv1DBlock(256, 512, 3, 20)
-    print(param(nnet))
-
-
-def foo_layernorm():
-    C, T = 256, 20
-    nnet1 = nn.LayerNorm([C, T], elementwise_affine=True)
-    print(param(nnet1, Mb=False))
-    nnet2 = nn.LayerNorm([C, T], elementwise_affine=False)
-    print(param(nnet2, Mb=False))
-'''
-def foo_conv_tas_net(config:dict):
-    #x = torch.rand(4, 1000)
-    nnet = ConvTasNet(config)
-    print(nnet)
-    print("ConvTasNet #param: {:.2f}".format(count_parameters(nnet)))
-    #x = nnet(x)
-    #s1 = x[0]
-    #print(s1.shape)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -403,6 +414,13 @@ if __name__ == "__main__":
     args=parser.parse_args()
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
-        foo_conv_tas_net(config)
-    # foo_conv1d_block()
-    # foo_layernorm()
+
+    model = ConvTasNet(config)
+
+    lengths = [1600, 65536, 161231, 323453]
+    for length in lengths:
+        x = torch.rand(4, length)
+        s = torch.rand(4, length)
+        y,_ = model(x, s)
+        print(x.shape)
+        print(y.shape)

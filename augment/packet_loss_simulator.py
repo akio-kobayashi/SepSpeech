@@ -18,6 +18,8 @@ class State:
         
 class GilbertElliotModel:
     def __init__(self, plr=0.1, lmd=0.5, p_g=0.0, p_b=0.5):
+        if plr < 0.0001:
+            plr = 0.0
         p_alpha = (1.-lmd) * (1. - (p_b - plr)/(p_b - p_g))
         #print(f'P_alpha = {p_alpha:.3f}')
         p_beta = (1.-lmd) * (p_b - plr)/(p_b - p_g)

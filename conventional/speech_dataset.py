@@ -20,7 +20,7 @@ from augment.reverb_augment import ReverbAugment
 '''
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, padding_value=0) -> None:
+    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0) -> None:
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(csv_path)
@@ -47,7 +47,6 @@ class SpeechDataset(torch.utils.data.Dataset):
                 f"Drop {max_len - len(self.enroll_df)} utterances from {max_len} "
                 f"(shorter than {enroll_segment} seconds)"
             )
-        self.padding_value = padding_value
 
     def __len__(self) -> int:
         return len(self.df)
@@ -68,9 +67,6 @@ class SpeechDataset(torch.utils.data.Dataset):
         else:
             source = None
         mixture, sr = torchaudio.load(self.mixture_path)
-        if self.padding_value > 0:
-            mixture = self.get_padded_value(mixture)
-        
         std, mean = torch.std_mean(mixture, dim=-1)
         mixture = (mixture - mean)/std
         mixture = mixture[:, start:stop]
@@ -83,20 +79,14 @@ class SpeechDataset(torch.utils.data.Dataset):
         enroll = (enroll - mean)/std
         return torch.t(mixture), torch.t(source), torch.t(enroll), source_speaker
     
-    def get_padded_value(self, x):
-        v = self.padding_value - x.shape[-1] % self.padding_value
-        x = F.pad(x, pad=(1, v), value=0.)
-        return x
-
 # On-the-fly ミキシング
 class SpeechDatasetOTFMix(SpeechDataset):
     def __init__(self, csv_path:str, noise_csv_path:str, enroll_csv_path:str, 
                  mixing:dict, augment:dict,
                  sample_rate=16000,
                  segment=0,
-                 enroll_segment=0,
-                 padding_value=0) -> None:
-        super().__init__(csv_path, enroll_csv_path, sample_rate, segment, enroll_segment, padding_value)
+                 enroll_segment=0) -> None:
+        super().__init__(csv_path, enroll_csv_path, sample_rate, segment, enroll_segment)
         self.noise_df = pd.read_csv(noise_csv_path)
         self.min_snr=mixing['min_snr']
         self.max_snr=mixing['max_snr']
@@ -140,8 +130,6 @@ class SpeechDatasetOTFMix(SpeechDataset):
         assert os.path.exists(source_path)
         source, sr = torchaudio.load(source_path)
         source = source[:, start:stop]
-        if self.padding_value > 0:
-            source = self.get_padded_value(source)
             
         reverb_source = None
         if self.source_reverb:
@@ -244,8 +232,8 @@ if __name__ == '__main__':
     mixture, source, enroll, speaker = dataset.__getitem__(10)
 
 class SpeechDatasetCTC(SpeechDataset):
-    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, padding_value=0, tokenizer=None):
-        super.__init__(csv_path, enroll_path, sample_rate, segment, enroll_segment, padding_value)
+    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, tokenizer=None):
+        super.__init__(csv_path, enroll_path, sample_rate, segment, enroll_segment)
         self.tokenizer = tokenizer
         
     def __getitem__(self, idx:int):

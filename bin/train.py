@@ -22,20 +22,21 @@ def main(config:dict, checkpoint_path=None):
 #    else:
     model = LitSepSpeaker(config)
 
+    '''
     padding_value = 0
     if config['model_type'] == 'tasnet':
         padding_value = model.get_padding_value()
-
-    if config['unet']['ctc']['use']:
+    '''
+    
+    if config['ctc']['use']:
         tokenizer = ASRTokenizer(config['dataset']['tokenizer'])
         
-    if config['unet']['ctc']['use'] is False:
+    if config['ctc']['use'] is False:
         train_dataset = SpeechDataset(csv_path=config['dataset']['train']['csv_path'],
                                       enroll_path=config['dataset']['train']['enroll_csv_path'],
                                       sample_rate=config['dataset']['segment']['sample_rate'],
                                       segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                      padding_value=padding_value)
+                                      enroll_segment=config['dataset']['segment']['enroll_segment'])
         train_loader = data.DataLoader(dataset=train_dataset,
                                        **config['dataset']['process'],
                                        pin_memory=True,
@@ -46,20 +47,18 @@ def main(config:dict, checkpoint_path=None):
                                          enroll_path=config['dataset']['train']['enroll_csv_path'],
                                          sample_rate=config['dataset']['segment']['sample_rate'],
                                          segment=config['dataset']['segment']['segment'],
-                                         enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                         padding_value=padding_value)
+                                         enroll_segment=config['dataset']['segment']['enroll_segment'])
         train_loader = data.DataLoader(dataset=train_dataset,
                                        **config['dataset']['process'],
                                        pin_memory=True,
                                        shuffle=True, 
                                        collate_fn=lambda x: conventional.speech_dataset.data_processing_ctc(x))
-    if config['unet']['ctc']['use'] is False:
+    if config['ctc']['use'] is False:
         valid_dataset = SpeechDataset(csv_path=config['dataset']['valid']['csv_path'],
                                       enroll_path=config['dataset']['valid']['enroll_csv_path'],
                                       sample_rate=config['dataset']['segment']['sample_rate'],
                                       segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                      padding_value=padding_value)
+                                      enroll_segment=config['dataset']['segment']['enroll_segment'])
         valid_loader = data.DataLoader(dataset=valid_dataset,
                                        **config['dataset']['process'],
                                        pin_memory=True,
@@ -71,7 +70,6 @@ def main(config:dict, checkpoint_path=None):
                                       sample_rate=config['dataset']['segment']['sample_rate'],
                                       segment=config['dataset']['segment']['segment'],
                                       enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                      padding_value=padding_value,
                                       tokenizer=tokenizer)
         valid_loader = data.DataLoader(dataset=valid_dataset,
                                        **config['dataset']['process'],

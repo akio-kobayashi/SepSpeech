@@ -16,6 +16,7 @@ import yaml
 import numpy as np
 import whisper
 
+'''
 def get_divisor(model):
 
     start = -1
@@ -36,6 +37,7 @@ def get_divisor(model):
 def padding(x, divisor):
     pad_value = divisor - x.shape[-1] % divisor -1
     return F.pad (x, pad=(1, pad_value ), value=0.)
+'''
 
 def read_audio(path):
     wave, sr = torchaudio.load(path)
@@ -54,9 +56,10 @@ def main(args):
     assert args.checkpoint is not None
     model = LitSepSpeaker.load_from_checkpoint(args.checkpoint,
                                                config=config).to(device)
-    divisor=0
-    if args.model_type == 'tasnet':
-        divisor = get_divisor(model)
+    #divisor=0
+    #if args.model_type == 'tasnet':
+    #    divisor = get_divisor(model)
+    
     model.eval()
     
     sample_rate = config['dataset']['segment']['sample_rate']
@@ -103,8 +106,8 @@ def main(args):
 
             # normalize and padding
             mixture = (mixture - mix_mean)/mix_std
-            if divisor > 0 and mixture_original_length % divisor > 0:
-                mixture = padding(mixture, divisor)
+            #if divisor > 0 and mixture_original_length % divisor > 0:
+            #    mixture = padding(mixture, divisor)
 
             estimate, _, _ = model(mixture.to(device), enroll.to(device))
             estimate = estimate[:, :mixture_original_length]

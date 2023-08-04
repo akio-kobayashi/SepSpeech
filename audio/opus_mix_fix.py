@@ -20,6 +20,8 @@ def adjusted_rms(_rms, snr):
     return _rms / (10**(float(snr) / 20))
 
 def mix(source, noise, snr):
+    if snr >= 60:
+        return source
     source_rms = rms(source)
     noise_rms = rms(noise)
 
@@ -114,7 +116,7 @@ def main(args):
             mixture = mix(source, noise, snr)
 
         markov_states=None
-        if df_mixed is not None:
+        if df_mixed is not None and args.renew_markov_states is False:
             markov_states = np.load(row['markov_states'])
         mixture, bps, packet_loss_rate, resample, markov_states = opus_func(mixture, bps, packet_loss_rate, markov_states)
         markov_states=np.array(markov_states)
@@ -154,6 +156,7 @@ if __name__ == '__main__':
     parser.add_argument('--rt60', type=float, default=0.2)
     parser.add_argument('--bps', type=int, default=16000)
     parser.add_argument('--packet_loss_rate', type=float, default=0.1)
+    parser.add_argument('--renew_markov_states', action='store_true')
     
     args=parser.parse_args()
 

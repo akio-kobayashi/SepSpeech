@@ -112,19 +112,18 @@ class MaskingBlock(nn.Module):
 class E3Net(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.depth = 4
 
-        self.encoder = LearnableEncoder()
-        self.speaker_block = SpeakerBlock()
-        self.concate_block = FeatureConcatBlock()
+        self.encoder = LearnableEncoder(**config['encoder'])
+        self.speaker_block = SpeakerBlock(**config['speaker'])
+        self.concate_block = FeatureConcatBlock(**config['concat'])
 
         block=nn.ModuleList()
-        for _ in range(self.depth):
+        for _ in range(config['depth']):
             block.append(LSTMBlock())
         self.lstm_block = nn.Sequential(*block)
         
-        self.masking_block = MaskingBlock()
-        self.decoder = LearnableDecoder()
+        self.masking_block = MaskingBlock(**config['masking'])
+        self.decoder = LearnableDecoder(**config['decoder'])
 
     '''
     def valid_length(self, length):
@@ -169,19 +168,19 @@ class E3Net(nn.Module):
 
         _, output_length = y.shape
         start = (output_length - input_length)//2
-        return y[:, start:start+input_length]
+        return y[:, start:start+input_length], z, None
 
 if __name__ == '__main__':
     with open("config.yaml", 'r') as yf:
         config = yaml.safe_load(yf)
 
-    model = E3Net(config)
+    model = E3Net(config['e3net'])
     #length = 65536
     length = 161231
     #length = 1600
     x = torch.rand(4, length)
     s = torch.rand(4, length)
-    y = model(x, s)
+    y, _, _ = model(x, s)
     print(x.shape)
     print(y.shape)
     

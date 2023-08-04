@@ -1,11 +1,11 @@
-model_type: unet # tasnet/unet/unet2
+model_type: tasnet # tasnet/unet/unet2/e3net
 dataset:
   process:
     batch_size: 8
     num_workers: 1
   segment:
-    segment: 0
-    enroll_segment: 0
+    segment: 10
+    enroll_segment: 20
     sample_rate: 16000
   train:
     csv_path: 'audio/csv/mix_train.csv'
@@ -74,8 +74,8 @@ trainer:
 optimizer:
   lr: 1.e-4
 logger:
-  save_dir: './'
-  version: 6
+  save_dir: './tasnet'
+  version: 1
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
@@ -106,7 +106,7 @@ tasnet:
   kernel_size: 20
   in_channels: 256
   enc_channels: 256
-  conv_channels: 512
+  conv_channels: 256
   num_blocks: 6
   block_kernel_size: 3
   num_repeats: 4
@@ -129,9 +129,57 @@ unet: #unet/unet2
   reference: 0.1
   causal: True
   num_speakers: 307
-  ctc:
-    use: False
-    weight: 1.0
+ctc:
+  use: False
+  weight: 1.0
+  parameters:
+  kernel_size: 8
+  stride: 4
+  padding: 4
+  chout: 256
+  outdim: 41
+e3net:
+  depth: 4
+  encoder:
+    chin: 1
+    chout: 2048
+    kernel_size: 400
+    stride: 160
+    padding: 200
+  decoder:
+    chin: 2048
+    chout: 1
+    kernel_size: 400
+    stride: 160
+    padding: 0
+    output_padding: 0
+  lstm:
+    dim: 1024
+    hidden_dim: 256
+  speaker:
+    chin: 2048
+    chout: 256
+    kernel_size: 3
+    num_speakers: 307
+  concat:
+    x_dim: 2048
+    s_dim: 256
+    output_dim: 256
+  masking:
+    x_dim: 256
+    output_dim: 2048
+emformer:
+  input_dim: 256
+  num_heads: 8
+  ffn_dim: 1024
+  num_layers: 5
+  segment_length: 20
+  dropout: 0.1
+  activation: 'relu'
+  left_context_length: 0
+  right_context_length: 5 
+  max_memory_size: 0
+  tanh_on_mem: False
 sepformer:
   channels: 256
   kernel_size: 16

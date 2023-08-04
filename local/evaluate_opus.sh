@@ -4,15 +4,15 @@ rootdir=/export1/Speech/mixture/test_b01-25/estimate
 csvdir=audio/csv/test/
 
 cofig=config.yaml
-model_type=unet
-checkpoint=lightning_logs/version_6/checkpoints/checkpoint_epoch=399-step=359600-valid_loss=0.075.ckpt
+model_type=tasnet
+checkpoint=tasnet/lightning_logs/version_1/checkpoints/last.ckpt
 
 # opus encoded speech
-for snr in 20 10 0;
+for snr in 60 20 10 0;
 do
     for bps in 6000 12000 16000;
     do
-	for packet_loss_rate in 0.00001 0.05;
+	for packet_loss_rate in 0.00001 0.05 0.1;
 	do
 	    for gender in male female;
 	    do
