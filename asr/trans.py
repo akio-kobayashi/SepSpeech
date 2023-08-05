@@ -11,6 +11,48 @@ import math
 import numpy as np
 from model import Sequence, Subsampler, DownSampler
 
+class Rearrange(nn.Module):
+    def __init__(self, pattern):
+        super().__init__()
+        self.pattern = pattern
+
+    def forward(self, x):
+        return rearrange(x, self.pattern)
+    
+class UpSampler(nn.Module):
+    def __init__(self, in_channels, output_channels, kernel_size, stride, padding, output_padding):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.stride=stride
+        self.padding = padding
+        self.output_padding = output_padding
+        self.upsampler = nn.Sequential(
+            nn.LayerNorm(in_channels),
+            nn.Linear(in_channels, output_channels),
+            nn.ReLU(),
+            nn.LayerNorm(output_channels),
+            Rearrange('b t c -> b c t'),
+            nn.ConvTranspose1d(output_channels,
+                               output_channels,
+                               kernel_size=kernel_size,
+                               stride=stride,
+                               padding=padding,
+                               output_padding=output_padding
+                               ),
+            nn.ReLU(),
+            Rearrange('b c t -> b t c'),
+            nn.LayerNorm(output_channels),
+        )
+        
+    def forward(self, x):
+        x = self.upsampler(x)
+        return x
+
+    def valid_length(self, length):
+        # (length - 1) * 3 -2*6//2 + 5 + 1 
+        length = (length - 1) * self.stride -2 * self.padding + (self.kernel_size - 1) + self.output_padding + 1
+        return length
+        
 class TransTransducer(nn.Module):
     def __init__(self, device,
                  input_vocab_size,
@@ -21,7 +63,8 @@ class TransTransducer(nn.Module):
                  num_layers=16,
                  num_heads=8,
                  dropout=.5,
-                 blank=0):
+                 blank=0,
+                 upsample=4):
         super(TransTransducer, self).__init__()
         self.input_vocab_size = input_vocab_size
         self.embed_size = embed_size
@@ -30,14 +73,18 @@ class TransTransducer(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.num_heads = num_heads
+        self.upsample = upsample
         self.loss = RNNTLoss()
 
         # NOTE encoder & decoder only use lstm
         # instead of RNN, just use conformer block
         encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads)
         self.encoder = nn.TransformerEncoder(encoder_layer, self.num_layers)
-        self.input_embed = nn.Embedding(self.input_vocab_size, hidden_size)
+        self.input_embed = nn.Embedding(self.input_vocab_size, embed_size)
+        self.upsampler = UpSampler(embed_size, hidden_size, kernel_size=6, stride=self.upsample, padding=3, output_padding=0)
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
+
+        self.downsampler=None
         
         self.embed = nn.Embedding(vocab_size, vocab_size-1, padding_idx=blank)
         self.embed.weight.data[1:] = torch.eye(vocab_size-1)
@@ -48,8 +95,8 @@ class TransTransducer(nn.Module):
         self.fc1 = nn.Linear(2*cell_size, cell_size)
         self.fc2 = nn.Linear(cell_size, vocab_size)
 
-    def valid_input_lengths(self, x):
-        return x
+    def valid_length(self, length:int):
+        return self.upsampler.valid_length(length)
     
     def joint(self, f, g):
         ''' `f`: encoder output (B,T,U,2H)
@@ -62,6 +109,7 @@ class TransTransducer(nn.Module):
 
     def ff_encoder(self, xs):
         xs = self.input_embed(xs)
+        xs = self.upsampler(xs)
         xs = self.encoder(xs)
         xs = self.fc0(xs)
 
@@ -69,6 +117,7 @@ class TransTransducer(nn.Module):
 
     def forward(self, xs, ys, xlen, ylen, return_loss=True):
         xs = self.input_embed(xs)
+        xs = self.upsampler(xs)
         xs = self.encoder(xs)
         xs = self.fc0(xs) # (B, time//scale, hidden_size)
 
@@ -105,8 +154,10 @@ class TransTransducer(nn.Module):
         if ff is True:
             if self.downsampler is not None:
                 x = self.downsampler(x)
-                x = self.encoder(x)
-                x = self.fc0(x)
+            x = self.input_embed(x)
+            x = self.upsampler(x)
+            x = self.encoder(x)
+            x = self.fc0(x)
 
         vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
         # vector preserve for embedding

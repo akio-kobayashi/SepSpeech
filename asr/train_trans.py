@@ -47,13 +47,13 @@ def main():
 
     shuffle = False if config['analysis']['sort_by_len'] is True else False
     
-    train_dataset=TextDataset(config['dataset']['train']['csv_path'], config, tokenizer, output_tokenizer)
+    train_dataset=TextDataset(config['dataset']['train']['csv_path'], config, tokenizer, output_tokenizer, upsample=config['transformer']['upsample'])
     train_loader =data.DataLoader(dataset=train_dataset,
                                   batch_size=config['dataset']['process']['batch_size'],
                                   shuffle=shuffle,
                                   collate_fn=lambda x: text_generator.data_processing(x,'train'),
                                   **kwargs)
-    valid_dataset=TextDataset(config['dataset']['valid']['csv_path'], config, tokenizer, output_tokenizer)
+    valid_dataset=TextDataset(config['dataset']['valid']['csv_path'], config, tokenizer, output_tokenizer, upsample=config['transformer']['upsample'])
     valid_loader=data.DataLoader(dataset=valid_dataset,
                                  batch_size=config['dataset']['process']['batch_size'],
                                  shuffle=shuffle,
@@ -69,14 +69,14 @@ def main():
     network=TransTransducer(device,
                             **config['transformer']
                             )
-    print(network)
+    #print(network)
     print('Number of Parameters: ', sum([param.nelement() for param in network.parameters()]))
 
     if args.pretrained is not None:
         network.load_state_dict(torch.load(args.pretrained, map_location=torch.device('cpu')))
     network = network.to(device)
 
-    optimizer=optim.AdamW(network.parameters(), config['optimizer']['lr'])
+    optimizer=optim.RAdam(network.parameters(), config['optimizer']['lr'])
     if config['max_epochs'] == 0:
         epochs=1
     else:
@@ -118,7 +118,7 @@ def main():
     path = os.path.join(model_dir, config['decode_output'])
 
     with torch.no_grad():
-        cer = solver_trans.decode(network, device, eval_loader, tokenizer, path)
+        cer = solver_trans.decode(network, device, eval_loader, tokenizer, output_tokenizer, path)
 
 if __name__ == "__main__":
     

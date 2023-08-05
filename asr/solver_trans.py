@@ -17,8 +17,10 @@ def train(network, device, train_loader, optimizer, scheduler, epoch,
     for batch_idx, _data in enumerate(train_loader):
         input_labels, output_labels, input_lengths, output_lengths, _ = _data
 
+        valid_lengths = [ network.valid_length(l) for l in input_lengths ]
         input_labels, output_labels = input_labels.to(device), output_labels.to(device)
-        input_lengths, output_lengths = torch.tensor(input_lengths).to(torch.int32), torch.tensor(output_lengths).to(torch.int32)
+        input_lengths, output_lengths = torch.tensor(valid_lengths).to(torch.int32), torch.tensor(output_lengths).to(torch.int32)
+            
         input_lengths.to(device), output_lengths.to(device)
 
         optimizer.zero_grad()
@@ -50,8 +52,9 @@ def test(network, device, test_loader, epoch, iter_meter, writer):
         for i, _data in enumerate(test_loader):
             input_labels, output_labels, input_lengths, output_lengths, _ = _data
 
+            valid_lengths = [ network.valid_length(l) for l in input_lengths ]
             input_labels, output_labels = input_labels.to(device), output_labels.to(device)
-            input_lengths, output_lengths = torch.tensor(input_lengths).to(torch.int32), torch.tensor(output_lengths).to(torch.int32)
+            input_lengths, output_lengths = torch.tensor(valid_lengths).to(torch.int32), torch.tensor(output_lengths).to(torch.int32)
             input_lengths.to(device), output_lengths.to(device)
 
             loss = network(input_labels, output_labels, input_lengths, output_lengths)
@@ -76,7 +79,7 @@ def test(network, device, test_loader, epoch, iter_meter, writer):
     network.train()
     return avg_cer
 
-def decode(network, device, test_loader, tokenizer, outpath, beam_search=False):
+def decode(network, device, test_loader, tokenizer, output_tokenizer, outpath, beam_search=False):
     network.eval()
 
     test_loss = 0
@@ -88,8 +91,10 @@ def decode(network, device, test_loader, tokenizer, outpath, beam_search=False):
             for i, _data in enumerate(test_loader):
                 input_labels, output_labels, input_lengths, output_lengths, keys = _data
 
+                valid_lengths = [ network.valid_length(l) for l in input_lengths ]
+
                 input_labels, output_labels = input_labels.to(device), output_labels.to(device)
-                input_lengths, output_lengths = torch.tensor(input_lengths).to(torch.int32), torch.tensor(output_lengths).to(torch.int32)
+                input_lengths, output_lengths = torch.tensor(valid_lengths).to(torch.int32), torch.tensor(output_lengths).to(torch.int32)
                 input_lengths.to(device), output_lengths.to(device)
 
                 xs = network.ff_encoder(input_labels)

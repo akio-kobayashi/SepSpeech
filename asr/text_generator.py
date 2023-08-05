@@ -11,10 +11,16 @@ import yaml
 
 class TextDataset(torch.utils.data.Dataset):
 
-    def __init__(self, path, config:dict, tokenizer=None, output_tokenizer=None):
+    def __init__(self, path, config:dict, tokenizer=None, output_tokenizer=None, upsample=4):
         super().__init__()
 
+        self.upsample = upsample
+        #pattern = re.compile('\s\s+')
+        self.pattern = re.compile(r'⠲$')
+        
         self.df = pd.read_csv(path)
+
+        self.check_source_target_lengths()
         
         if config['analysis']['sort_by_len']:
             self.df = self.df.sort_values('input_length')
@@ -36,7 +42,7 @@ class TextDataset(torch.utils.data.Dataset):
         row = self.df.iloc[idx]
         
         #pattern = re.compile('\s\s+')
-        pattern = re.compile(r'⠲$')
+        #pattern = re.compile(r'⠲$')
         
         label_path = row['input_label']
         label = None
@@ -53,12 +59,36 @@ class TextDataset(torch.utils.data.Dataset):
         assert os.path.exists(output_label_path)
         with open(output_label_path, 'r') as f:
             line = f.readline()
-            output_label = re.sub(pattern, '', line.strip())
+            output_label = re.sub(self.pattern, '', line.strip())
             output_label = self.output_tokenizer.text2token(output_label)
             output_label = torch.tensor(output_label, dtype=torch.int32)
         assert output_label is not None and len(output_label) > 0
 
         return label, output_label, row['key']
+
+    def check_source_target_lengths(self):
+        max_len = len(self.df)
+        remove_indices = []
+        for index, row in self.df.iterrows():
+            input_length = output_length = 0
+            with open(row['input_label'], 'r') as  f:
+                line = f.readline().strip()
+                input_length = len(list(line))
+                
+            with open(row['output_label'], 'r') as f:
+                line = f.readline().strip()
+                line = re.sub(self.pattern, '', line)
+                output_length = len(list(line))
+
+            if input_length == 0 or output_length == 0:
+                remove_indices.append(index)
+            if self.upsample * input_length < output_length:
+                remove_indices.append(index)
+                
+        self.df.drop(index=remove_indices, inplace=True)
+        print(
+                f"Drop {len(remove_indices)} utterances from {max_len} "
+        )
 
 '''
     data_processing

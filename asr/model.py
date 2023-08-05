@@ -216,8 +216,8 @@ class Transducer(nn.Module):
         if ff is True:
             if self.downsampler is not None:
                 x = self.downsampler(x)
-                x = self.encoder(x)
-                x = self.fc0(x)
+            x = self.encoder(x)
+            x = self.fc0(x)
 
         vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
         # vector preserve for embedding
