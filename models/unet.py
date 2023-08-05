@@ -277,10 +277,10 @@ class UNet(nn.Module):
             #    x = self.adpt(x, enc_s)
             x = encode(x)
             if enc_s is not None:
-                x = rearrange(x, 'b c t -> b t c')
-                x = transform(x)
-                x = rearrange(x, 'b t c -> b c t')
-                x = self.adpt(x, enc_s)
+                #s = rearrange(s, 'b c t -> b t c')
+                s = transform(enc_s)
+                #s = rearrange(s, 'b t c -> b c t')
+                x = self.adpt(x, s)
             skips.append(x)
         if self.lstm is not None:
             x = x.permute(2, 0, 1) # (b c t) -> (t b c)
