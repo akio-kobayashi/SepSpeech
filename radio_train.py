@@ -69,5 +69,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('high')
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
-
+    if 'config' in config.keys():
+        config = config['config']
     main(config, args.checkpoint, args.dict_path)

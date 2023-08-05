@@ -54,8 +54,9 @@ class LitDenoiser(pl.LightningModule):
         d = {}
         _loss = 0.
         if self.stft_loss is not None:
-            _stft_loss1, _stft_loss2 = self.stft_loss(estimates, targets)
-            _loss += self.stft_loss_weight * (_stft_loss1 + _stft_loss2)
+            with torch.amp.autocast('cuda', dtype=torch.float32):
+                _stft_loss1, _stft_loss2 = self.stft_loss(estimates, targets)
+                _loss += self.stft_loss_weight * (_stft_loss1 + _stft_loss2)
             d[prefix+'stft_loss'] = _stft_loss1 + _stft_loss2
         if self.pesq_loss is not None:
             with torch.amp.autocast('cuda', dtype=torch.float32):

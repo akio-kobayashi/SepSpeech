@@ -18,7 +18,7 @@ def compute_adjusted_rms(rms:Tensor, snr:float):
     return rms/(10 ** snr / 20)
 
 def white_noise(length:int):
-    return torch.rand(size=(1, length), dtype=torch.float32) - 0.5
+    return torch.normal(mean=0., std=1., size=(1, length))
     
 def narrow_band_noise(length:int, sample_rate:int=16000, central_freq:int=4000, Q=100.0):
     return F.bandpass_biquad(white_noise(length), sample_rate, central_freq, Q, const_skirt_gain=False)

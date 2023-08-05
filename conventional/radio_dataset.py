@@ -103,10 +103,13 @@ class RadioDataset(torch.utils.data.Dataset):
                 noise += self.narrow_band(source)
 
             if self.fading_augment is not None:
-                mixture = self.fading_augment(self.lowpass(source)) + noise
+                mixture = self.fading_augment(source) + noise
             else:
-                mixture = self.lowpass(source) + noise
-                
+                mixture = source + noise
+
+            mixture = self.lowpass(mixture)
+            std, mean = torch.std_mean(mixture, dim=-1)
+            mixture = (mixture - mean)/std
             #mixture = self.random_amp(self.lowpass(source)) + noise
         
         return torch.t(mixture), torch.t(source)
