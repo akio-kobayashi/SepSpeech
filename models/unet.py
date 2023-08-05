@@ -267,9 +267,9 @@ class UNet(nn.Module):
             #    x = self.adpt(x, enc_s)
             x = encode(x)
             if enc_s is not None:
-                x = rearrange(x, 'b c t -> b t c')
-                x = transform(x)
-                x = rearrange(x, 'b t c -> b c t')
+                s = rearrange(enc_s, 'b c t -> b t c')
+                s = transform(s)
+                s = rearrange(s, 'b t c -> b c t')
                 x = self.adpt(x, enc_s)
             skips.append(x)
         if self.lstm is not None:
@@ -280,15 +280,9 @@ class UNet(nn.Module):
             x = x.permute(0, 2, 1)
             x = self.attention(x)
             x = x.permute(0, 2, 1)
-        #for decode, transform in zip(self.decoder, self.transform_d):
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[...,:x.shape[-1]]
-            #if enc_s is not None:
-            #    x = rearrange(x, 'b c t -> b t c')
-            #    x = transform(x)
-            #    x = rearrange(x, 'b t c -> b c t')
-            #    x = self.adpt(x, enc_s)
             x = decode(x)
         if self.resample == 2:
             x = downsample2(x)
