@@ -46,8 +46,18 @@ def _levenshtein_distance(ref, hyp):
                 distance[cur_row_idx][j] = min(s_num, i_num, d_num)
     return distance[m%2][n]
 
-def cer(ref, hyp):
-    edit_distance = _levenshtein_distance(ref, hyp)
+def cer(ref, hyp, max_ignore_index=7):
+    removed = []
+    prv_id=-1
+    for h in hyp:
+        if prv_id == id:
+            continue
+        prv_id = id
+        if id <= max_ignore_index:
+            continue
+        removed.append(h)
+
+    edit_distance = _levenshtein_distance(ref, removed)
 
     if len(ref) == 0:
         raise ValueError("Length of reference should be greater than 0")
