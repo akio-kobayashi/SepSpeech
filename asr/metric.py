@@ -49,13 +49,13 @@ def _levenshtein_distance(ref, hyp):
 def cer(ref, hyp, max_ignore_index=7):
     removed = []
     prv_id=-1
-    for h in hyp:
+    for id in hyp:
         if prv_id == id:
             continue
         prv_id = id
         if id <= max_ignore_index:
             continue
-        removed.append(h)
+        removed.append(id)
 
     edit_distance = _levenshtein_distance(ref, removed)
 
