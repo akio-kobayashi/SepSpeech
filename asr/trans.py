@@ -52,7 +52,7 @@ class UpSampler(nn.Module):
                       output_channels,
                       kernel_size=kernel_size,
                       stride=1,
-                      padding=padding)
+                      padding=padding),
             '''
             nn.ConvTranspose1d(output_channels,
                                output_channels,
