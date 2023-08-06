@@ -51,7 +51,7 @@ transformer:
   hidden_size: 256 #512
   dim_feedforward: 1024 #2048
   num_layers: 16 #17
-  num_heads: 8
+  num_heads: 4
   cell_size: 320 #640
   upsample: 4
 logger:
