@@ -60,4 +60,4 @@ model_output: 'best.pt'
 decode_output: 'decode.trn'
 max_epochs: 100
 optimizer:
-  lr: 4.0e-5 #1.e-4
+  lr: 1.e-4 #4.0e-5 #1.e-4
