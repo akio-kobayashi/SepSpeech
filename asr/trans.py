@@ -53,15 +53,6 @@ class UpSampler(nn.Module):
                       kernel_size=kernel_size,
                       stride=1,
                       padding=padding),
-            '''
-            nn.ConvTranspose1d(output_channels,
-                               output_channels,
-                               kernel_size=kernel_size,
-                               stride=stride,
-                               padding=padding,
-                               output_padding=output_padding
-                               ),
-            '''
             nn.ReLU(),
             Rearrange('b c t -> b t c'),
             nn.LayerNorm(output_channels),
