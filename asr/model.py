@@ -107,6 +107,7 @@ class DownSampler(nn.Module):
  RNN Transducer
     from https://github.com/HawkAaron/E2E-ASR/blob/91d6b96bd605a9bc8e62b4a5903ec2056fa0f88d/model.py#L37
 '''
+@torch.compile
 class Transducer(nn.Module):
     def __init__(self, device, vocab_size, hidden_size=144,
                  cell_size=320, num_layers=16, num_heads=8,
