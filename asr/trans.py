@@ -47,7 +47,7 @@ class UpSampler(nn.Module):
             nn.ReLU(),
             nn.LayerNorm(output_channels),
             Rearrange('b t c -> b c t'),
-            nn.Upsample(scale_factor=(1, factor), mode="nearest"),
+            nn.Upsample(scale_factor=factor, mode="nearest"),
             nn.Conv1d(in_channels, 
                       output_channels,
                       kernel_size=kernel_size,
