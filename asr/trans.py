@@ -79,11 +79,15 @@ class TransTransducer(nn.Module):
                  num_heads=8,
                  dropout=.5,
                  blank=0,
+                 bos_token=1,
+                 eos_token=2,
                  upsample=4):
         super(TransTransducer, self).__init__()
         self.input_vocab_size = input_vocab_size
         self.embed_size = embed_size
         self.blank = blank
+        self.bos_token = bos_token
+        self.eos_token = eos_token
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.dim_feedforward = dim_feedforward
@@ -99,7 +103,7 @@ class TransTransducer(nn.Module):
         self.input_embed = nn.Embedding(self.input_vocab_size, embed_size)
         self.upsampler = UpSampler(embed_size, hidden_size, factor=self.upsample, 
                                    kernel_size=5, padding=5//2)
-        self.input_pos_embed = PositionEncoding(hidden_size, max_len=500)
+        self.input_pos_embed = PositionEncoding(hidden_size, max_len=2048)
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
 
         self.downsampler=None
@@ -180,7 +184,8 @@ class TransTransducer(nn.Module):
             x = self.encoder(x)
             x = self.fc0(x)
 
-        vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
+        #vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
+        vy = torch.LongTensor([self.bos_token]).view(1,1)
         # vector preserve for embedding
         if x.is_cuda: vy = vy.cuda()
         y, h = self.decoder(self.embed(vy)) # decode first zero
@@ -205,7 +210,8 @@ class TransTransducer(nn.Module):
         use_gpu = xs.is_cuda
         def forward_step(label, hidden):
             ''' `label`: int '''
-            label = autograd.Variable(torch.LongTensor([label]), volatile=True).view(1,1)
+            #label = autograd.Variable(torch.LongTensor([label]), volatile=True).view(1,1)
+            label = torch.LongTensor([label]).view(1,1)
             if use_gpu: label = label.cuda()
             label = self.embed(label)
             pred, hidden = self.decoder(label, hidden)

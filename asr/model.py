@@ -2,7 +2,7 @@
 import copy
 import torch
 import torch.nn as nn
-from torch import autograd
+#from torch import autograd
 import torch.nn.functional as F
 import conformer
 from warprnnt_pytorch import RNNTLoss
@@ -110,9 +110,11 @@ class DownSampler(nn.Module):
 class Transducer(nn.Module):
     def __init__(self, device, vocab_size, hidden_size=144,
                  cell_size=320, num_layers=16, num_heads=8,
-                 dropout=.5, blank=0):
+                 dropout=.5, blank=0, bos_token=1, eos_token=2):
         super(Transducer, self).__init__()
         self.blank = blank
+        self.bos_token = bos_token
+        self.eos_token = eos_token
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -183,7 +185,8 @@ class Transducer(nn.Module):
         xs = self.fc0(xs) # (B, time//scale, hidden_size)
 
         # concat first zero
-        zero = autograd.Variable(torch.zeros((ys.shape[0], 1)).long())
+        #zero = autograd.Variable(torch.zeros((ys.shape[0], 1)).long())
+        zero = torch.zeros((ys.shape[0], 1).long())
         if ys.is_cuda: zero = zero.cuda()
         ymat = torch.cat((zero, ys), dim=1)
         # forward pm
@@ -219,7 +222,8 @@ class Transducer(nn.Module):
             x = self.encoder(x)
             x = self.fc0(x)
 
-        vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
+        #vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
+        vy = torch.LongTensor([self.bos_token]).view(1,1)
         # vector preserve for embedding
         if x.is_cuda: vy = vy.cuda()
         y, h = self.decoder(self.embed(vy)) # decode first zero
@@ -251,7 +255,8 @@ class Transducer(nn.Module):
         use_gpu = xs.is_cuda
         def forward_step(label, hidden):
             ''' `label`: int '''
-            label = autograd.Variable(torch.LongTensor([label]), volatile=True).view(1,1)
+            #label = autograd.Variable(torch.LongTensor([label]), volatile=True).view(1,1)
+            label = torch.LongTensor([label]).view(1,1)
             if use_gpu: label = label.cuda()
             label = self.embed(label)
             pred, hidden = self.decoder(label, hidden)
