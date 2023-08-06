@@ -11,6 +11,24 @@ import math
 import numpy as np
 from model import Sequence, Subsampler, DownSampler
 
+class PositionEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=3000):
+        super(PositionEncoding, self).__init__()
+        self.dropout = nn.Dropout(dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0)/d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0) # (b, t, f)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        x = x + self.pe[:, :T, :]
+        return self.dropout(x)
+    
 class Rearrange(nn.Module):
     def __init__(self, pattern):
         super().__init__()
@@ -59,6 +77,7 @@ class TransTransducer(nn.Module):
                  embed_size,
                  vocab_size,
                  hidden_size=144,
+                 dim_feedforward=1024,
                  cell_size=320,
                  num_layers=16,
                  num_heads=8,
@@ -71,6 +90,7 @@ class TransTransducer(nn.Module):
         self.blank = blank
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
+        self.dim_feedforward = dim_feedforward
         self.num_layers = num_layers
         self.num_heads = num_heads
         self.upsample = upsample
@@ -78,9 +98,10 @@ class TransTransducer(nn.Module):
 
         # NOTE encoder & decoder only use lstm
         # instead of RNN, just use conformer block
-        encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads)
+        encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads, self.dim_feedforward)
         self.encoder = nn.TransformerEncoder(encoder_layer, self.num_layers)
         self.input_embed = nn.Embedding(self.input_vocab_size, embed_size)
+        self.input_pos_embed = PositionEncoding(embed_size, max_len=500)
         self.upsampler = UpSampler(embed_size, hidden_size, kernel_size=6, stride=self.upsample, padding=3, output_padding=0)
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
 
@@ -109,6 +130,7 @@ class TransTransducer(nn.Module):
 
     def ff_encoder(self, xs):
         xs = self.input_embed(xs)
+        xs = self.input_pos_embed(xs)
         xs = self.upsampler(xs)
         xs = self.encoder(xs)
         xs = self.fc0(xs)
@@ -117,6 +139,7 @@ class TransTransducer(nn.Module):
 
     def forward(self, xs, ys, xlen, ylen, return_loss=True):
         xs = self.input_embed(xs)
+        xs = self.input_pos_embed(xs)
         xs = self.upsampler(xs)
         xs = self.encoder(xs)
         xs = self.fc0(xs) # (B, time//scale, hidden_size)
@@ -155,6 +178,7 @@ class TransTransducer(nn.Module):
             if self.downsampler is not None:
                 x = self.downsampler(x)
             x = self.input_embed(x)
+            x = self.input_pos_embed(x)
             x = self.upsampler(x)
             x = self.encoder(x)
             x = self.fc0(x)
