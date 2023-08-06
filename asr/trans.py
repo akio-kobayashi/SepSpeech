@@ -97,7 +97,7 @@ class TransTransducer(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads, self.dim_feedforward)
         self.encoder = nn.TransformerEncoder(encoder_layer, self.num_layers)
         self.input_embed = nn.Embedding(self.input_vocab_size, embed_size)
-        self.upsampler = UpSampler(embed_size, hidden_size, factor=self.upsample 
+        self.upsampler = UpSampler(embed_size, hidden_size, factor=self.upsample, 
                                    kernel_size=5, padding=5//2)
         self.input_pos_embed = PositionEncoding(hidden_size, max_len=500)
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
