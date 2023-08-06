@@ -50,8 +50,8 @@ class ConvNeXTBlock(nn.Module):
             LayerScale(in_channels, scale)
         )
     def forward(self, x:Tensor) -> Tensor:
-        # (b 1 t f)
-        return self.block(x)
+        # residual
+        return x + self.block(x)
 
 class LayerNorm(nn.Module):
     def __init__(self, dim):
