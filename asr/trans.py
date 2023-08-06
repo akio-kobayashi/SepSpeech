@@ -40,7 +40,7 @@ class Rearrange(nn.Module):
 class UpSampler(nn.Module):
     def __init__(self, in_channels, output_channels, factor, kernel_size, padding):
         super().__init__()
-
+        self.factor = factor
         self.upsampler = nn.Sequential(
             nn.LayerNorm(in_channels),
             nn.Linear(in_channels, output_channels),
@@ -64,8 +64,8 @@ class UpSampler(nn.Module):
 
     def valid_length(self, length):
         # (length - 1) * 3 -2*6//2 + 5 + 1 
-        length = (length - 1) * self.stride -2 * self.padding + (self.kernel_size - 1) + self.output_padding + 1
-        return length
+        #length = (length - 1) * self.stride -2 * self.padding + (self.kernel_size - 1) + self.output_padding + 1
+        return self.factor * length
         
 class TransTransducer(nn.Module):
     def __init__(self, device,
