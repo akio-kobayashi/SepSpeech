@@ -11,6 +11,66 @@ import math
 from einops import rearrange
 from models.ctc import CTCBlock
 
+class PositionEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=3000):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0)/d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = rearrange(pe, '(b t) c -> b c t', b=1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        B, C, T = x.shape
+        x = x + self.pe[:, :, :T]
+        return self.dropout(x)
+
+class MergeBlock(nn.Module):
+    def __init__(self, in_channels:int, aux_channels:int, out_channels:int, kernel_size:int, stride:int, padding:int) -> None:
+        super().__init__()
+        self.pos_enc = PositionEncoding(aux_channels, max_len=640000)
+        self.conv = nn.Conv1d(
+            in_channels + aux_channels,
+            out_channels,
+            kernel_size = kernel_size,
+            stride = stride,
+            padding = padding
+        )
+        
+    def forward(self, x:Tensor,  s:Tensor):
+        B, C, T = x.shape
+        s = self.pos_enc(rearrange(s, 'b (c t) -> b c t', t=1).repeat((1, 1, T)))
+        y = torch.concat([x, s], dim=1)
+        y = self.conv(y)
+        return y
+    
+class SpeakerNetwork(nn.Module):
+    def __init__(self, encoder, in_channels:int, out_channels:int, kernel_size:int, num_speakers:int) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.conv = nn.Conv1d(
+            in_channels,      # 256
+            out_channels,
+            kernel_size,      # 16
+            1,
+            kernel_size//2, # padding
+            1
+        )
+        self.act = nn.ReLU()
+        self.linear=nn.Linear(out_channels, num_speakers)
+
+    def forward(self, x:torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
+        # tensor: (b c t)
+        y = self.encoder(x)
+        y = self.conv(y)
+        y = torch.mean(y, dim=-1) # (B, C)
+        z = self.linear(self.act(y)) # (B, S)
+        return y, z
+
 class TFEncoder(nn.Module):
     def __init__(self, dim, n_layers=5, n_heads=8):
         super(TFEncoder, self).__init__()
@@ -178,13 +238,18 @@ class UNet(nn.Module):
             ]
             self.encoder.append(nn.Sequential(*encode))
 
-            transf = []
-            transf += [
-                nn.ReLU(),
-                nn.Linear(mid_channels, mid_channels)
-            ]
-            self.transform.append(nn.Sequential(*transf))
-
+            #transf = []
+            #transf += [
+            #    nn.ReLU(),
+            #    nn.Linear(mid_channels, mid_channels)
+            #]
+            #self.transform.append(nn.Sequential(*transf))
+            self.transform.append(MergeBlock(mid_channels,
+                                             mid_channels,
+                                             mid_channels,
+                                             kernel_size=3,
+                                             stride=1,
+                                             padding=3//2))
             #transf_d = []
             #transf_d += [
                 #nn.ReLU(),
@@ -217,16 +282,25 @@ class UNet(nn.Module):
         if self.rescale:
             rescale_module(self, reference=reference)
         from models.sepformer import Encoder
-        spk_encoder = Encoder(config)
-        from models.speaker import SpeakerNetwork
+
+        spk_encoder = nn.Sequential(
+            nn.Conv1d(config['unet']['in_channels'],
+                      config['unet']['mid_channels'],
+                      self.kernel_size,
+                      self.stride),
+            nn.ReLU(),
+            nn.Conv1d(config['unet']['mid_channels'],
+                      config['unet']['mid_channels'],
+                      1),
+            nn.ReLU()
+        )
+        
         self.speaker = SpeakerNetwork(spk_encoder,
                                       config['unet']['mid_channels'],
                                       config['unet']['mid_channels'],
                                       config['unet']['kernel_size'],
                                       config['unet']['num_speakers'])
-        from models.speaker import SpeakerAdaptationLayer
-        self.adpt = SpeakerAdaptationLayer(config['speaker']['adpt_type'])
-
+  
         self.ctc_block=None        
         if config['ctc']['use']:
             self.ctc_block = CTCBlock(config['ctc']['parameters'])
@@ -253,7 +327,9 @@ class UNet(nn.Module):
     def forward(self, mix:Tensor, enr:Tensor) -> Tuple[Tensor, Tensor]:
         if mix.dim() == 2:
             mix = mix.unsqueeze(1) 
-        
+        if enr.dim() == 2:
+            enr = enr.unsqueeze(1)
+            
         if self.normalize:
             mono = mix.mean(dim=1, keepdim=True)
             std = mono.std(dim=1, keepdim=True)
@@ -273,14 +349,9 @@ class UNet(nn.Module):
         if enr is not None:
             enc_s, y = self.speaker(enr)
         for n, [encode, transform] in enumerate(zip(self.encoder, self.transform)):
-            #if n == 1 and enc_s is not None:
-            #    x = self.adpt(x, enc_s)
             x = encode(x)
             if enc_s is not None:
-                #s = rearrange(s, 'b c t -> b t c')
-                s = transform(enc_s)
-                #s = rearrange(s, 'b t c -> b c t')
-                x = self.adpt(x, s)
+                x = transform(x, enc_s)
             skips.append(x)
         if self.lstm is not None:
             x = x.permute(2, 0, 1) # (b c t) -> (t b c)
