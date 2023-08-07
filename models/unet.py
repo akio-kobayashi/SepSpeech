@@ -243,10 +243,8 @@ class UNet(nn.Module):
             #self.transform.append(nn.Sequential(*transf))
             self.transform.append(MergeBlock(mid_channels,
                                              mid_channels,
-                                             mid_channels,
-                                             kernel_size=3,
-                                             stride=1,
-                                             padding=3//2))
+                                             mid_channels)
+                                  )
             #transf_d = []
             #transf_d += [
                 #nn.ReLU(),
