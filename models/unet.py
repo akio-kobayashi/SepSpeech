@@ -30,23 +30,20 @@ class PositionEncoding(nn.Module):
         return self.dropout(x)
 
 class MergeBlock(nn.Module):
-    def __init__(self, in_channels:int, aux_channels:int, out_channels:int, kernel_size:int, stride:int, padding:int) -> None:
+    def __init__(self, in_channels:int, aux_channels:int, out_channels:int) -> None:
         super().__init__()
-        self.pos_enc = PositionEncoding(aux_channels, max_len=640000)
-        self.conv = nn.Conv1d(
-            in_channels + aux_channels,
-            out_channels,
-            kernel_size = kernel_size,
-            stride = stride,
-            padding = padding
-        )
+        #self.pos_enc = PositionEncoding(aux_channels, max_len=640000)
+        #self.linear = nn.Linear(in_channels+aux_channels, out_channels, bias=False)
         
     def forward(self, x:Tensor,  s:Tensor):
-        B, C, T = x.shape
-        s = self.pos_enc(rearrange(s, 'b (c t) -> b c t', t=1).repeat((1, 1, T)))
-        y = torch.concat([x, s], dim=1)
-        y = self.conv(y)
-        return y
+        # factoring
+        return x * rearrange(s, 'b (c t) -> b c t', t=1)
+        #B, C, T = x.shape
+        #s = self.pos_enc(rearrange(s, 'b (c t) -> b c t', t=1).repeat((1, 1, T)))
+        #y = torch.concat([x, s], dim=-1)
+        #z = self.linear(rearrange(y, 'b c t -> b t c'))
+        #z = rearrnage(z, 'b t c -> b c t')
+        #return x+z
     
 class SpeakerNetwork(nn.Module):
     def __init__(self, encoder, in_channels:int, out_channels:int, kernel_size:int, num_speakers:int) -> None:
