@@ -1,0 +1,79 @@
+model_type: unet
+# dataset
+dataset:
+  process:
+    batch_size: 8
+    num_workers: 2
+  segment:
+    segment: 10
+    enroll_segment: 20
+    sample_rate: 16000
+  train:
+    csv_path: 'audio/csv/train_3p_phone.csv'
+    enroll_path: 'audio/csv/enroll_3p.csv'
+  valid:  
+    csv_path: 'audio/csv/valid_3p_phone.csv'
+    enroll_path: 'audio/csv/enroll_3p.csv'
+  test:
+    csv_path: 
+    enroll_path:
+  #tokenizer: 'audio/csv/vocab_phone/vocab.json'
+  sort_by_len: False
+# trainer parameters
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 400
+  precision: '16-mixed'
+  profiler: 'simple'
+  gradient_clip_val: 5.
+optimizer:
+  lr: 1.e-4 #4.0e-5 #1.0e-4
+scheduler:
+  max_lr: 1.e-4
+  total_steps: 300000
+  pct_start: 0.2
+logger:
+  save_dir: './'
+  version: 1
+  name: 'lightning_logs'
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_top_k: 1
+  mode: 'min'
+  every_n_epochs: 1
+# training parameters
+loss:
+speaker:
+  adpt_type: 'residual'
+ddpm:
+  encodec_dim: 8
+  encodec_codebook_size: 1024
+  encdec_kernel_size: 3
+  dim: 128
+  channels: 128
+  resnet_block_groups: 4
+  num_speakers: 307
+unet:
+  attention: True
+  normalize: False #True
+  floor: 0.1
+  depth: 3
+  # (encodec_dim, one-hot) -> (encodec_dim, embedding_size)
+  encodec_dim: 8
+  encodec_codebook_size: 1024
+  embedding size: 256
+  # (encodec_dim, embedding_size) -> (in_channels, embedding_size) ->
+  # (mid_channels, embedding_size) -> (out_channels, embeeding_size) ->
+  # (encodec_dim, codebooksize)
+  encdec_kernel_size: 3
+  in_channels: 8
+  mid_channels: 256 #512 #48
+  out_channels: 8
+  max_channels: 10000
+  kernel_size: 3
+  growth: 1 #2
+  stride: 4
+  causal: True
+  num_speakers: 307
