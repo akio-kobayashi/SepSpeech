@@ -29,6 +29,29 @@ class PositionEncoding(nn.Module):
         x = x + self.pe[:, :, :T]
         return self.dropout(x)
 
+class ConcatBlock(nn.Module):
+    def __init__(self, input_dim, aux_dim, output_dim, eps=1.e-8):
+        super().__init__()
+        
+        self.pre = nn.Sequential(nn.PReLU(),
+                                 nn.LayerNorm(input_dim, eps=eps)
+                                )
+        self.post = nn.Sequential(nn.Linear(input_dim+aux_dim, output_dim),
+                                  nn.PReLU(),
+                                  nn.LayerNorm(output_dim, eps=eps)
+                                )
+        
+    def forward(self, x:Tensor, s:Tensor):
+        ''' x (b c1 t), s (b c2 t)'''
+        B, C, T = x.shape
+        y = rearrange(x, 'b c t -> b t c')
+        y = self.pre(y)
+        s = rearrange(s, 'b (c t) -> b t c', t=1).repeat((1, T, 1))
+        y = torch.cat((y, s), dim=-1)
+        y = self.post(y)
+        y = rearrange(y, 'b t c -> b c t')
+        return x + y
+    
 class MergeBlock(nn.Module):
     def __init__(self, in_channels:int, aux_channels:int, out_channels:int) -> None:
         super().__init__()
@@ -241,9 +264,9 @@ class UNet(nn.Module):
             #    nn.Linear(mid_channels, mid_channels)
             #]
             #self.transform.append(nn.Sequential(*transf))
-            self.transform.append(MergeBlock(mid_channels,
-                                             mid_channels,
-                                             mid_channels)
+            self.transform.append(ConcatBlock(mid_channels,
+                                              mid_channels,
+                                              mid_channels)
                                   )
             #transf_d = []
             #transf_d += [

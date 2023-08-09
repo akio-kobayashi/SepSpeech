@@ -6,55 +6,85 @@ import torch.nn as nn
 from torch import Tensor
 import math
 from einops import rearrange
-from lm.qnt_modules  import QntSpeakerNetwork, QntSpeakerAdaptationLayer, PointwiseConv2d, DepthwiseConv2d, DepthwiseConvTranspose2d, Conv2d, ConvTranspose2d
-class Rearrange(nn.Module):
+#from models.qnt_encode import EncodecQuantizer
+#from models.ctc import CTCBlock
 
-def get_padded_value(x, valid_length):
-    assert x.dim() == 3
-    B, C, T = x.shape
-    assert T > valid_length
-    pad = torch.zeros((1, C, 1))
-    pad[:, :, 0] = mixture[:, :, -1]
-    pad = pad.repeat(1, 1, T-valid_length)
-    
-    return torch.concat ([x, pad], dim=-1)
-    
-class QntEncoder(nn.Module):
-    def __init__(self, sym_dim, emb_dim, in_channels, out_channels, kernel_size, stride=1):
+class QuantizeEncoder(nn.Module):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
-
-        assert kernel_size % 2 == 0
-        self.embed = nn.Embedding(sym_dim, emb_dim)
-        self.conv = nn.Conv2d(in_channels,
-                              out_channels,
-                              kernel_size,
-                              stride,
-                              padding=kernel_size//2
-                    )
-        
+        self.block = nn.Sequential(
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=3//2
+            ),
+        )
     def forward(self, x):
-        x = self.embed(x)
-        x = self.conv(x)  # (B C T) -> (B C' T H)
-        return x
-
-class QntDecoder(nn.Module):
-    def __init__(self, sym_dim, emb_dim, in_channels, out_channels, kernel_size, stride=1):
-        super().__init__()
-
-        assert kernel_size % 2 == 0
-        self.conv = nn.Conv2d(in_channels,
-                              out_channels,
-                              kernel_size,
-                              stride,
-                              paddig=kernel_size//2
-                    )
-        self.linear = nn.Linear(emb_dim, sym_dim)
-        
-    def forward(self, x):
-        x = self.conv(x)   # (B C T H) -> 
-        x = self.linear(x) # (B C T O)
-        return x
+        # (b 8 t) -> (b out_channels t emedding_dim)
+        return self.block(x)
     
+class QuantizeDecoder(nn.Module):
+    def __init__(self, in_channels, out_channels=8, embedding_dim=256, num_embeddings=1024):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=3//2
+            ),
+            nn.Linear(embedding_dim, num_embeddings)
+        )
+    def forward(self, x):
+        # (b in_channels, t, embedding_dim)  -> (b 8 t 1024)
+        return self.block(x)
+
+class ConcatBlock(nn.Module):
+    def __init__(self, input_dim, aux_dim, output_dim, eps=1.e-8):
+        super().__init__()
+        
+        self.pre = nn.Sequential(nn.PReLU(),
+                                 nn.LayerNorm(input_dim, eps=eps)
+                                )
+        self.post = nn.Sequential(nn.Linear(input_dim+aux_dim, output_dim),
+                                  nn.PReLU(),
+                                  nn.LayerNorm(output_dim, eps=eps)
+                                )
+        
+    def forward(self, x:Tensor, s:Tensor):
+        ''' x (b c1 t h), s (b c2 t h)'''
+        B, C, T, H = x.shape
+        x = rearrange(x, 'b c t h -> b t h c')
+        y = self.pre(x)
+        s = rearrange(s, 'b (t h c) -> b t h c', t=1, c=1).repeat((1, T, H, 1))
+        y = torch.cat((x, s), dim=-1) 
+        y = x + self.post(y)
+        y = rearrange(y, 'b t h c -> b c t h')
+        return y
+    
+class SpeakerNetwork(nn.Module):
+    def __init__(self, in_channels:int, out_channels:int, kernel_size:int, num_speakers:int) -> None:
+        super().__init__()
+        self.conv = nn.Conv2d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=1,
+            padding=kernel_size//2, # padding
+        )
+        self.act = nn.ReLU()
+        self.linear=nn.Linear(out_channels, num_speakers)
+
+    def forward(self, x:torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
+        # tensor: (b c t h)
+        x = self.conv(x)
+        y = torch.mean(torch.mean(x, dim=-2), dim=-1) # (b c)
+        z = self.linear(self.act(y)) # (b s)
+        return y, z
+
 class TFEncoder(nn.Module):
     def __init__(self, dim, n_layers=5, n_heads=8):
         super(TFEncoder, self).__init__()
@@ -65,7 +95,23 @@ class TFEncoder(nn.Module):
                                              num_layers=n_layers)
 
     def forward(self, x, mask=None, padding_mask=None):
-        return self.encoder(x, mask, padding_mask)
+        B, C, T, H = x.shape
+        x = rearrange(x, 'b c t h -> b t (c h)')
+        x = self.encoder(x, mask, padding_mask)
+        x = rearrange(x, 'b t (c h) -> b c t h', c=C, h=H)
+        return x
+    
+def rescale_conv(conv, reference):
+    std = conv.weight.std().detach()
+    scale = (std / reference)**0.5
+    conv.weight.data /= scale
+    if conv.bias is not None:
+        conv.bias.data /= scale
+
+def rescale_module(module, reference):
+    for sub in module.modules():
+        if isinstance(sub, (nn.Conv1d, nn.ConvTranspose1d)):
+            rescale_conv(sub, reference)
 
 class BLSTM(nn.Module):
     def __init__(self, dim, layers=2, bi=True):
@@ -80,93 +126,141 @@ class BLSTM(nn.Module):
             self.linear = nn.Linear(2 * dim, dim)
 
     def forward(self, x, hidden=None):
+        B, C, T, H = x.shape
+        x = rearrange(x, 'b c t h -> t b (c h)')
         x, hidden = self.lstm(x, hidden)
         if self.linear:
             x = self.linear(x)
-        return x, hidden
+        return rearrange(x, 't b (c h) -> b c t h', c=C), hidden
 
-class UNet(nn.Module):
+class EncoderBlock(nn.Module):
+    def __init__(self, chin:int, chout:int, kernel_size:int=3) -> None:
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(chin*4, chout, kernel_size, stride=1, padding=kernel_size//2),
+            nn.ReLU(),
+            nn.Conv2d(chout, chout, kernel_size, stride=1, padding=kernel_size//2),
+            nn.ReLU()
+        )
+    
+    def forward(self, x:Tensor) -> Tensor:
+        x = rearrnage(x, 'b c (t p1) (h p2) -> b (c*p1*p2) t h', p1=2, p2=2)
+        return self.block(x)
+
+class DecoderBlock(nn.Module):
+    def __init__(self, chin:int, chout:int, kernel_size:int=3, append=False) -> None:
+        super().__init__()
+        block = [
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Conv2d(chin, chout, kernel_size, stride=1, padding=kernel_size//2),
+            nn.ReLU(),
+            nn.Conv2d(chin, chout, kernel_size, stride=1, padding=kerlen_size//2),
+        ]
+        if append:
+            block.append(nn.ReLU())
+        self.block = nn.Sequential(*block)
+
+    def forward(self, x:Tensor) -> Tensor:
+        return self.block(x)
+    
+class QntUNet(nn.Module):
     def __init__(self, config:dict) -> None:
         super().__init__()
-        self.normalize = config['normalize']
-        self.floor = config['floor']
-        self.depth = config['depth']
+        self.normalize = config['qnt_unet']['normalize']
+        self.floor = config['qnt_unet']['floor']
+        #self.resample = config['qnt_unet']['resample']
+        self.depth = config['qnt_unet']['depth']
 
-        encodec_dim=config['encodec_dim']       # 8
-        cb_size=config['encodec_codebook_size'] # 1024
-        emb_size=config['embedding size']
-        encdec_kernel_size=config['encdec_kernel_size']
-        in_channels=config['in_channels']
-        mid_channels=config['mid_channels']
-        out_channels=config['out_channels']
-        max_channels=config['max_channels']
-        self.kernel_size=config['kernel_size']
-        growth=config['growth']
-        self.stride=config['stride']
-
-        self.qnt_encoder = QntEncoder(cb_size, emb_size, encodec_dim, in_channels, encdec_kernel_size)
-        self.qnt_decoder = QntDecoder(cb_size, emb_size, in_channels, encodec_dim, encdec_kernel_size)
+        in_channels=config['qnt_unet']['in_channels']
+        mid_channels=config['qnt_unet']['mid_channels']
+        out_channels=config['qnt_unet']['out_channels']
+        max_channels=config['qnt_unet']['max_channels']
+        self.kernel_size=config['qnt_unet']['kernel_size']
+        growth=config['qnt_unet']['growth']
+        #self.rescale=config['qnt_unet']['rescale']
+        self.stride=config['qnt_unet']['stride'] # stride shoud be 2
+        #reference=config['qnt_unet']['reference']
+        embedding_channels=config['qnt_unet']['embedding_channels']
+        num_embeddings=config['qnt_unet']['num_embeddings']
+        
+        #self.quantizer = EncodecQuantizer() # inference mode
+        self.qnt_encoder = QuantizeEncoder(embedding_channels, in_channels)
+        self.qnt_decoder = QuantizeDecoder(out_channels, embedding_channels, embedding_dim, num_embeddings)
         
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
         self.transform = nn.ModuleList()
-
         for index in range(self.depth):
-            encode = []
-            encode += [
-                Conv2d(emb_size, in_channels, mid_channels, self.kernel_size, self.stride)
-            ]
-            self.encoder.append(nn.Sequential(*encode))
+            self.encoder.append(EncoderBlock(
+                in_channels,
+                mid_channels,
+                self.kernel_size
+            ))
 
-            transf = []
-            transf += [
-                QntSpeakerAdaptationLayer(config['adpt_type'], [emb_size, emb_size])
-            ]
-            self.transform.append(nn.Sequential(*transf))
-
-            decode = []
-            decode += [
-                ConvTranspose2d(emb_size, mid_channels, out_channels, self.kernel_size, self.stride)
-            ]
-            if index > 0:
-                decode.append(nn.ReLU())
-            self.decoder.insert(0, nn.Sequential(*decode))
+            self.transform.append(ConcatBlock(mid_channels,
+                                              mid_channels,
+                                              mid_channels)
+                                  )
+            self.decoder.insert(0,
+                                DecoderBlock(
+                                    mid_channels,
+                                    out_channels,
+                                    self.kernel_size,
+                                    append = False if index == 0 else True
+                                ))
             out_channels = mid_channels
             in_channels = mid_channels
             mid_channels = min(int(growth * mid_channels), max_channels)
-            
+
         self.lstm=None
         self.attention=None
-        if config['unet']['attention'] is False:
-            self.lstm = BLSTM(emb_size, bi=not config['unet']['causal'])
+        channels = in_channels//self.total_stride() * embedding_dim//self.total_stride()
+        if config['qnt_unet']['attention'] is False:
+            self.lstm = BLSTM(channels, bi=not config['qnt_unet']['causal'])
         else:
-            self.attention = TFEncoder(emb_size)
-
-        self.speaker = QntSpeakerNetwork(emb_size,
-                                         mid_channels,
-                                         mid_channels,
-                                         kernel_size,
-                                         num_speakers
-                                         )
+            self.attention = TFEncoder(channels)
             
+        #if self.rescale:
+        #    rescale_module(self, reference=reference)
+        self.speaker = SpeakerNetwork(spk_encoder,
+                                      config['qnt_unet']['mid_channels'],
+                                      config['qnt_unet']['mid_channels'],
+                                      config['qnt_unet']['kernel_size'],
+                                      config['qnt_unet']['num_speakers'])
+        '''
+        self.ctc_block=None        
+        if config['ctc']['use']:
+            self.ctc_block = CTCBlock(config['ctc']['parameters'])
+        '''
+
     def valid_length(self, length):
-        #length = math.ceil(length * self.resample)
         for idx in range(self.depth):
-            length = math.ceil((length - self.kernel_size)/self.stride) + 1
-            length = max(length, 1)
+            length = length // 2 # downsample
+            length = int (length + 2 * self.kernel_size//2 - self.kernel_size + 1)
         for idx in range(self.depth):
-            length = (length - 1) * self.stride + self.kernel_size
-        #length = int(math.ceil(length/self.resample))
+            length = length * 2 # updample
+            length = int (length + 2 * self.kernel_size//2 - self.kernel_size + 1)
         return int(length)
-    
+
+    '''
+    def valid_length_ctc(self, length):
+        length = self.valid_length(length)
+        length = self.ctc_block.valid_length(length)
+        return int(length)
+    '''
+
     @property
     def total_stride(self):
         #return self.stride ** self.depth // self.resample
         return self.stride ** self.depth
-
+    
     def forward(self, mix:Tensor, enr:Tensor) -> Tuple[Tensor, Tensor]:
-        if mix.dim() == 2:
-            mix = mix.unsqueeze(1) 
+        # (b emb_dim t emb_size) -> (b chin t emb_size)
+        mix = self.qnt_encoder(mix)
+        enr = self.qnt_encoder(enr)
+
+        length = mix.shape[-1]
+        mix = reshape(F.pad(reshape(mix, 'b c t h -> b c h t'), (0, self.valid_length(length) - length)),'b c h t -> b c t h')
         
         if self.normalize:
             mono = mix.mean(dim=1, keepdim=True)
@@ -174,52 +268,47 @@ class UNet(nn.Module):
             mix = mix/(self.floor + std)
         else:
             std = 1
-
-        B, C, T, H = mix.shape
-        mix = rearrange('b c t h -> b c h t')
-        mix = get_padded_value(mix, self.valid_length(T))
-        mix = rearrange('b c h t -> b c t h')
         
+        x = mix
+        '''
+        if self.resample == 2:
+            x = upsample2(x)
+        elif self.resample == 4:
+            x = upsample2(x)
+            x = upsample2(x)
+        '''
         skips = []
-        enc_s, y = None,None
-        if enr is not None:
-            enc_s, y = self.speaker(enr)
+        enc_s, y = self.speaker(enr)        
         for n, [encode, transform] in enumerate(zip(self.encoder, self.transform)):
             x = encode(x)
             if enc_s is not None:
                 x = transform(x, enc_s)
             skips.append(x)
-            
         if self.lstm is not None:
-            # B C T H -> T (B C) H
-            x = rearrange(x, 'b c t h -> t (b c) h')
             x, _ = self.lstm(x)
-            x = rearrange(x, 't (b c) h -> b t c h', b=B)
         else:
-            # B C T H -> (B C) T H
-            x = rearrange(x, 'b c t h -> (b c) t h')
             x = self.attention(x)
-            x = rearrange(x, '(b c) t h -> b c t h', b=B)
-            
+
+        #for decode, transform in zip(self.decoder, self.transform_d):
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[...,:x.shape[-1]]
             x = decode(x)
+
+        '''
+        z = None
+        if self.ctc_block is not None:
+            z = self.ctc_block(x)
+        '''
+        '''
         if self.resample == 2:
             x = downsample2(x)
         elif self.resample == 4:
             x = downsample2(x)
             x = downsample2(x)
+        '''
+        
         x = rearrange(x, 'b c t -> b (c t)')
         x = x[..., :length]
-        return std * x, y
+        return std * x, y, z
         
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, required=True)
-    args=parser.parse_args()
-    with open(args.config, 'r') as yf:
-        config = yaml.safe_load(yf)
-    model = UNet(config['unet'])
-    

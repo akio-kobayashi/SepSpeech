@@ -6,137 +6,111 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, List
 from torch import Tensor
 import torchaudio
-from lm.qnt_encode import EncodecQuantizer
+from augment.opus_augment_simulate import OpusAugment
+from augment.reverb_augment import ReverbAugment
+from models.qnt_encode import EncodecQuantizer
+from einops import rearrange
 
-class QntSpeechDataSet(torch.utils.data.Dataset):
-    def __init__(self, csv_path:str,
-                 enroll_path:str,
-                 sample_rate=16000,
-                 segment=0,
-                 enroll_segment=0,
-                 padding_value=0) -> None:
+'''
+    音声強調用データの抽出
+    入力: 音声CSV，エンロールCSV
+    出力: 混合音声，ソース音声，エンロール音声，話者インデックス
+        音声データはtorch.Tensor
+'''
+class QntSpeechDataset(torch.utils.data.Dataset):
+
+    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0) -> None:
         super().__init__()
 
         self.df = pd.read_csv(csv_path)
-        if segment > 0:
+        self.segment = segment if segment > 0 else 0
+        self.sample_rate = sample_rate
+        if self.segment > 0:
             max_len = len(self.df)
-            seg_len = int(segment * sample_rate)
-            self.df = self.df[self.df['length'] <= seg_len]
+            self.seg_len = int(self.segment * self.sample_rate)
+            self.df = self.df[self.df['length'] <= self.seg_len]
             print(
                 f"Drop {max_len - len(self.df)} utterances from {max_len} "
                 f"(shorter than {segment} seconds)"
             )
+        else:
+            self.seg_len = 0
 
         self.enroll_df = pd.read_csv(enroll_path)
-        if enroll_segment > 0:
+        self.enroll_segment = enroll_segment if enroll_segment > 0 else 0
+        if self.enroll_segment > 0:
             max_len = len(self.enroll_df)
-            seg_len = int(enroll_segment * sample_rate)
-            self.enroll_df = self.enroll_df[self.enroll_df['length'] <= seg_len]
+            self.seg_len = int(self.enroll_segment * self.sample_rate)
+            self.enroll_df = self.enroll_df[self.enroll_df['length'] <= self.seg_len]
             print(
                 f"Drop {max_len - len(self.enroll_df)} utterances from {max_len} "
                 f"(shorter than {enroll_segment} seconds)"
             )
-        
-        self.quantizer = EncodecQuantizer()
 
-    def get_padded_value(x):
-        B, C, T = x.shape
-        v = self.padding_value - T % self.padding_value
-        pad = torch.zeros((1, C, 1))
-        pad[:, :, 0] = mixture[:, :, -1]
-        pad = pad.repeat(1, 1, v)
-        return torch.concat ([x, pad], dim=-1)
+        self.quantizer = EnocdecQuantizer()
+        self.embed = nn.Embedding(num_embedding, embedding_dim)
+        
+    def __len__(self) -> int:
+        return len(self.df)
 
     def __getitem__(self, idx:int) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         row = self.df.iloc[idx]
-        start, stop = 0, -1
-        
-        # quantized data = B, C, T
-        mixture_path = row['mixture']
-        assert os.path.exists(mixture_path)
-        mixture = self.quantizer.encode_from_file(mixture_path)
-
-        source_path = row['source']
-        assert os.path.exists(source_path)
-        source = self.quantizer.encode_from_file(source_path)
-            
+        # mixture path
+        mixture = self.embed(self.quantizer.encode_from_file(row['mixture']))
+        source = self.embed(self.quantizer.encode_from_file(row['source']))
         source_speaker = int(row['index'])
         filtered = self.enroll_df.query('index == @source_speaker')
-        enroll_path = filtered.iloc[random.randint(0, len(filtered)-1)]['source']
-        assert os.path.exists(enroll_path)
-        enroll = self.quantizer.encode_from_file(enroll_path)
-
-        if self.padding_value > 1:
-            mixture = self.get_padded_value(mixture)
-            source = self.get_padded_value(source)
-
-        speaker = row['speaker']
-        
-        return mixture, source, enroll, speaker
-
-def pad_sequence_3d(xs):
-    B, C, T = xs[0]
-    xs = [ rearrange(x, 'b c t -> b (c t)') for x in xs ]
-    seq = nn.utils.rnn.pad_sequence(xs, batch_first=True)
-    seq = rearrange(seq, 'b (c t) -> b c t', c=C)
-    return seq
-
-def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Tensor, Tensor, list, list]:
+        enroll = self.embed(self.quantizer.encode_from_file(filtered.iloc[np.random.randint(0, len(filtered))]['source']))
+        return mixture, source, enroll, source_speaker
+    
+def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Tensor, Tensor, List, List]:
     mixtures = []
     sources = []
     enrolls = []
     lengths = []
     speakers = []
 
+    Q = 1024
     for mixture, source, enroll, speaker in data:
-        # w/o channel
-        mixtures.append(mixture)
-        if source is not None:
-            sources.append(source)
-        enrolls.append(enroll)
+        # c = 1
+        mixtures.append(rearrange(mixture, 'c q t h -> t (c q h)'))
+        sources.append(rearrange(source, 'c q t h -> t (c q h)'))
+        enrolls.append(rearrange(enroll, 'c q t h -> t (c q h)'))
         lengths.append(len(mixture))
         speakers.append(speaker)
 
-    mixtures = pad_sequence_3d(mixtures)
-    sources = pad_sequence_3d(sources)
-    enrolls = pad_sequence_3d(enrolls)
+    mixtures = nn.utils.rnn.pad_sequence(mixtures, batch_first=True)
+    sources = nn.utils.rnn.pad_sequence(sources, batch_first=True)
+    enrolls = nn.utils.rnn.pad_sequence(enrolls, batch_first=True)
     speakers = torch.from_numpy(np.array(speakers)).clone()
 
-    mixtures = mixtures.squeeze()
-    sources = sources.squeeze()
-    enrolls = enrolls.squeeze()
+    assert mixtures.dim() == 3
 
-    if mixtures.dim() == 2:
-        mixtures = mixtures.unsqueeze(0)
-        sources = sources.unsqueeze(0)
-        enrolls = enrolls.unsqueeze(0)
-        
+    mixtures = rearrange(mixtures, 'b t (q h) -> b q t h', q=Q)
+    sources = rearrange(sources, 'b t (q h) -> b q t h', q=Q)
+    enrolls = rearrange(enrolls, 'b t (q h) -> b q t h', q=Q)
+
     return mixtures, sources, enrolls, lengths, speakers
 
 if __name__ == '__main__':
-    import argparse, yaml
+    import argparse
+    import yaml
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     args=parser.parse_args()
-
+    
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
+    csv_path = config['dataset']['train']['csv_path']
+    noise_csv_path = config['dataset']['train']['noise_csv_path']
+    enroll_csv_path = config['dataset']['train']['enroll_csv_path']
 
-    dataset = QntSpeechDataSet(
-        **config['dataset']['valid'], 
-        **config['dataset']['segment']
-    )
-    loader = data.DataLoader(dataset=dataset,
-                             **config['dataset']['process'],
-                             pin_memory=True,
-                             shuffle=False, 
-                             collate_fn=lambda x: data_processing(x)
-                            )
-    mixture, source, enroll, speaker = loader.__getitem__(0)
-    print(mixture.shape)
-    print(source.shape)
-    print(enroll.shape)
-    
+    dataset = QntSpeechDataset(csv_path,
+                               enroll_csv_path
+                               )
+    mixture, source, enroll, speaker = dataset.__getitem__(10)
+
