@@ -58,8 +58,8 @@ class WhiteNoiseAugment(AugmentBase):
     def forward(self, x:Tensor):
         with torch.no_grad():
             snr = self.get_snr()
-            noise = white_noise(x.shape[-1])
-            factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise))
+            noise = white_noise(x.shape[-1]).cuda()
+            factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise)).cuda()
 
         return factor * noise
 
@@ -91,8 +91,8 @@ class NarrowBandNoiseAugment(AugmentBase):
                 central_freq = np.random.rand() * (self.max_central_freq - self.min_central_freq) + self.min_central_freq
                 Q = np.random.rand() * (self.max_Q - self.min_Q) + self.min_Q
             
-                noise = F.bandpass_biquad(noise, self.sample_rate, central_freq, Q, const_skirt_gain=False)
-                factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise))
+                noise = F.bandpass_biquad(noise, self.sample_rate, central_freq, Q, const_skirt_gain=False).cuda()
+                factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise)).cuda()
 
         return factor * noise
 

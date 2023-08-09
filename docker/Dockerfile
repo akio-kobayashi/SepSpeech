@@ -25,3 +25,4 @@ RUN pip3 install git+https://github.com/r9y9/pyopenjtalk.git --no-build-isolatio
 COPY test.py /usr/local/bin/
 RUN python3 /usr/local/bin/test.py
 RUN rm -f /usr/local/bin/test.py
+RUN pip3 install encodec

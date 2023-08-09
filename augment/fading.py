@@ -41,10 +41,10 @@ class FadingAugment(AugmentBase):
         signal = torch.nn.functional.interpolate(signal.unsqueeze(0), scale_factor=self.scaler).squeeze().unsqueeze(0)
         T = len(signal.t())
 
-        carrier = torch.arange(start=0, end=T)
-        carrier=torch.sign(2*np.pi*self.center_freq *carrier/self.Fs)
+        carrier = torch.arange(start=0, end=T).cuda()
+        carrier = torch.sign(2*np.pi*self.center_freq *carrier/self.Fs)
         mod_sig = signal * carrier
-        gain = self.channel_gain(fd, T)
+        gain = self.channel_gain(fd, T).cuda()
         gain = gain/torch.max(torch.abs(gain))
 
         demod_sig = (mod_sig * gain) * carrier
