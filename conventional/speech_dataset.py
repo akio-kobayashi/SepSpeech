@@ -20,7 +20,7 @@ from augment.reverb_augment import ReverbAugment
 '''
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0) -> None:
+    def __init__(self, csv_path:str, enroll_path:str, sample_rate=16000, segment=0, enroll_segment=0, random_select=0.0) -> None:
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(csv_path)
@@ -47,6 +47,7 @@ class SpeechDataset(torch.utils.data.Dataset):
                 f"Drop {max_len - len(self.enroll_df)} utterances from {max_len} "
                 f"(shorter than {enroll_segment} seconds)"
             )
+        self.random_select = random_select
 
     def __len__(self) -> int:
         return len(self.df)
@@ -77,6 +78,11 @@ class SpeechDataset(torch.utils.data.Dataset):
         enroll, sr = torchaudio.load(enroll_path)
         std, mean = torch.std_mean(enroll, dim=-1)
         enroll = (enroll - mean)/std
+
+        if self.random_select > 0.0:
+            if np.random.rand() < self.random_select:
+                mixture = source.detach().clone()
+            
         return torch.t(mixture), torch.t(source), torch.t(enroll), source_speaker
     
 # On-the-fly ミキシング

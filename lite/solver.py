@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from models.unet import UNet
 from models.unet2 import UNet2
+from models.fast_unet import FastUNet
 from models.conv_tasnet import ConvTasNet
 from models.e3net import E3Net
 from loss.stft_loss import MultiResolutionSTFTLoss
@@ -29,6 +30,8 @@ class LitSepSpeaker(pl.LightningModule):
             self.model = ConvTasNet(config)
         elif config['model_type'] == 'e3net':
             self.model = E3Net(config['e3net'])
+        elif config['model_type'] == 'fast_unet':
+            self.model = FastUNet(config)
         else:
             raise ValueError('wrong parameter: '+config['model_type'])
 

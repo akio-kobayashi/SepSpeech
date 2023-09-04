@@ -36,7 +36,8 @@ def main(config:dict, checkpoint_path=None):
                                       enroll_path=config['dataset']['train']['enroll_csv_path'],
                                       sample_rate=config['dataset']['segment']['sample_rate'],
                                       segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'])
+                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
+                                      random_select=config['dataset']['segment']['random_select'])
         train_loader = data.DataLoader(dataset=train_dataset,
                                        **config['dataset']['process'],
                                        pin_memory=True,
@@ -47,7 +48,9 @@ def main(config:dict, checkpoint_path=None):
                                          enroll_path=config['dataset']['train']['enroll_csv_path'],
                                          sample_rate=config['dataset']['segment']['sample_rate'],
                                          segment=config['dataset']['segment']['segment'],
-                                         enroll_segment=config['dataset']['segment']['enroll_segment'])
+                                         enroll_segment=config['dataset']['segment']['enroll_segment'],
+                                         random_select=config['dataset']['segment']['random_select'],
+                                         tokenizer=tokenizer)
         train_loader = data.DataLoader(dataset=train_dataset,
                                        **config['dataset']['process'],
                                        pin_memory=True,
@@ -58,7 +61,8 @@ def main(config:dict, checkpoint_path=None):
                                       enroll_path=config['dataset']['valid']['enroll_csv_path'],
                                       sample_rate=config['dataset']['segment']['sample_rate'],
                                       segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'])
+                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
+                                      random_select=config['dataset']['segment']['random_select'])
         valid_loader = data.DataLoader(dataset=valid_dataset,
                                        **config['dataset']['process'],
                                        pin_memory=True,
@@ -70,6 +74,7 @@ def main(config:dict, checkpoint_path=None):
                                       sample_rate=config['dataset']['segment']['sample_rate'],
                                       segment=config['dataset']['segment']['segment'],
                                       enroll_segment=config['dataset']['segment']['enroll_segment'],
+                                      random_select=config['dataset']['segment']['random_select'],
                                       tokenizer=tokenizer)
         valid_loader = data.DataLoader(dataset=valid_dataset,
                                        **config['dataset']['process'],

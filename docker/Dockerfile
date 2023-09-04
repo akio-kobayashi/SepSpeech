@@ -22,3 +22,4 @@ RUN wget https://github.com/git/git/archive/v${GIT_VERSION}.tar.gz && tar -xzf v
     && cd git-* && make prefix=/usr/local all && make prefix=/usr/local install
 RUN pip3 install git+https://github.com/openai/whisper.git
 RUN pip3 install git+https://github.com/TeamPyOgg/PyOgg
+RUN pip3 install encodec

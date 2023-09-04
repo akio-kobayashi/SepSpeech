@@ -400,7 +400,10 @@ class UNet(nn.Module):
         elif self.resample == 4:
             x = downsample2(x)
             x = downsample2(x)
-        x = rearrange(x, 'b c t -> b (c t)')
-        x = x[..., :length]
+        if x.shape[1] == 1:
+            x = rearrange(x, 'b c t -> b (c t)')
+            x = x[..., :length]
+        else:
+            x = x[..., :length]
         return std * x, y, z
         
