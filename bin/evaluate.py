@@ -16,28 +16,6 @@ import yaml
 import numpy as np
 import whisper
 
-'''
-def get_divisor(model):
-
-    start = -1
-    end = -1
-    s = torch.rand(4, 1000)
-    with torch.no_grad():
-        for n in range(1000, 1100):
-            x = torch.rand(4, n)
-            o, _, _ = model(x.cuda(), s.cuda())
-            if x.shape[-1] == o.shape[-1] :
-                if start < 0:
-                    start = n
-                else:
-                    end = n
-                    break
-    return end - start
-
-def padding(x, divisor):
-    pad_value = divisor - x.shape[-1] % divisor -1
-    return F.pad (x, pad=(1, pad_value ), value=0.)
-'''
 
 def read_audio(path):
     wave, sr = torchaudio.load(path)
@@ -53,12 +31,10 @@ def main(args):
         config = yaml.safe_load(yf)
 
     config['model_type'] = args.model_type
+    
     assert args.checkpoint is not None
     model = LitSepSpeaker.load_from_checkpoint(args.checkpoint,
                                                config=config).to(device)
-    #divisor=0
-    #if args.model_type == 'tasnet':
-    #    divisor = get_divisor(model)
     
     model.eval()
     
@@ -87,9 +63,14 @@ def main(args):
 
             mixture = read_audio(row['mixture'])
             source = read_audio(row['source'])
-            mix_pesq.append(_pesq(mixture.cuda(), source.cuda()).cpu().detach().numpy())
-            mix_stoi.append(_stoi(mixture.cuda(), source.cuda()).cpu().detach().numpy())
-            mix_sdr.append(_sdr(mixture.cuda(), source.cuda()).cpu().detach().numpy())
+            if not args.no_mix:
+                mix_pesq.append(_pesq(mixture.cuda(), source.cuda()).cpu().detach().numpy())
+                mix_stoi.append(_stoi(mixture.cuda(), source.cuda()).cpu().detach().numpy())
+                mix_sdr.append(_sdr(mixture.cuda(), source.cuda()).cpu().detach().numpy())
+            else:
+                mix_pesq.append('0.0')
+                mix_stoi.append('0.0')
+                mix_sdr.append('0.0')
 
             mix_std, mix_mean = torch.std_mean(mixture)
             src_std, src_mean = torch.std_mean(source)
@@ -128,16 +109,20 @@ def main(args):
 
             decoded = decoder.transcribe(outpath, verbose=None, language='ja')
             est_decoded.append(decoded['text'])
-            decoded = decoder.transcribe(row['mixture'], verbose=False, language='ja')
-            mix_decoded.append(decoded['text'])
+            if not args.no_mix:
+                decoded = decoder.transcribe(row['mixture'], verbose=False, language='ja')
+                mix_decoded.append(decoded['text'])
+            else:
+                mix_decoded.append('none')
             
     df_out['key'], df_out['mixture'], df_out['source'], df_out['enroll'], df_out['estimate'] = keys, mixtures, sources, enrolls, estimates
     df_out['mix_pesq'], df_out['mix_stoi'], df_out['mix_sdr'] = mix_pesq, mix_stoi, mix_sdr
     df_out['est_pesq'], df_out['est_stoi'], df_out['est_sdr'] = est_pesq, est_stoi, est_sdr
     df_out['mix_result'], df_out['est_result'] = mix_decoded, est_decoded
-    
-    pesq, stoi, sdr = np.mean(mix_pesq), np.mean(mix_stoi), np.mean(mix_sdr)
-    print("mixture:  PESQ = %.4f , STOI = %.4f, SI-SDR = %.4f" % (pesq, stoi, sdr))
+
+    if not args.no_mix:
+        pesq, stoi, sdr = np.mean(mix_pesq), np.mean(mix_stoi), np.mean(mix_sdr)
+        print("mixture:  PESQ = %.4f , STOI = %.4f, SI-SDR = %.4f" % (pesq, stoi, sdr))
     
     pesq, stoi, sdr = np.mean(est_pesq), np.mean(est_stoi), np.mean(est_sdr)
     print("estimate: PESQ = %.4f , STOI = %.4f, SI-SDR = %.4f" % (pesq, stoi, sdr))
@@ -153,6 +138,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_csv', type=str)
     parser.add_argument('--output_dir')
     parser.add_argument('--model_type', type=str, default='tasnet')
+    parser.add_argument('--no_mix', action='store_true')
     args = parser.parse_args()
 
     main(args)

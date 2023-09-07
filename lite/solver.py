@@ -35,9 +35,14 @@ class LitSepSpeaker(pl.LightningModule):
         else:
             raise ValueError('wrong parameter: '+config['model_type'])
 
+        # clustering loss
         self.ce_loss = nn.CrossEntropyLoss(reduction='sum')
         self.ce_loss_weight = config['loss']['ce_loss']['weight']
-        
+
+        # Mean Absolute Error (temporal domain)
+        self.l1_loss = nn.L1Loss()
+        self.l1_loss_weight = config['loss']['l1_loss']['weight']
+
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
         if config['loss']['stft_loss']['use']:
@@ -69,10 +74,15 @@ class LitSepSpeaker(pl.LightningModule):
         _ce_loss = self.ce_loss(estimate_spk, target_spk)
         _loss = self.ce_loss_weight * _ce_loss
 
+        _l1_loss = self.l1_loss(estimate, target)
+        _loss  += self.l1_loss_weight * _l1_loss
+        
         if valid:
             d['valid_ce_loss'] = _ce_loss
+            d['valid_l1_loss'] = _l1_loss
         else:
             d['train_ce_loss'] = _ce_loss
+            d['train_l1_loss'] = _l1_loss
 
         if self.stft_loss:
             _stft_loss1, _stft_loss2 = self.stft_loss(estimate, target)
