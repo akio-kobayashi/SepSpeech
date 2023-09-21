@@ -5,7 +5,7 @@ import pandas as pd
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-csv', type=str, nargs='*')
-    parser.add_argument('--ouput-csv', type=str, required=True)
+    parser.add_argument('--output-csv', type=str, required=True)
     args=parser.parse_args()
 
     df_merge=None

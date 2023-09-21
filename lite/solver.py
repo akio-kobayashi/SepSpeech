@@ -8,6 +8,7 @@ from models.unet2 import UNet2
 from models.fast_unet import FastUNet
 from models.conv_tasnet import ConvTasNet
 from models.e3net import E3Net
+from loss.mfcc_loss import MFCCLoss, LFCCLoss
 from loss.stft_loss import MultiResolutionSTFTLoss
 from loss.pesq_loss import PesqLoss
 from loss.sdr_loss import NegativeSISDR
@@ -15,6 +16,17 @@ from loss.stoi_loss import NegSTOILoss
 from typing import Tuple
 from einops import rearrange
 
+class L1Loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.loss = nn.L1Loss(reduction='sum')
+
+    def forward(self, preds, targets, lengths):
+        mask = torch.zeros_like(preds, dtype=preds.dtype, device=preds.device)
+        for b in range(len(preds)):
+            mask[:, :lengths[b]] = 1.
+        return self.loss(preds * mask, targets * mask) / torch.sum(mask)
+    
 '''
  PyTorch Lightning 用 solver
 '''
@@ -40,9 +52,26 @@ class LitSepSpeaker(pl.LightningModule):
         self.ce_loss_weight = config['loss']['ce_loss']['weight']
 
         # Mean Absolute Error (temporal domain)
-        self.l1_loss = nn.L1Loss()
-        self.l1_loss_weight = config['loss']['l1_loss']['weight']
-
+        if 'l1_loss' in config['loss'].keys():
+            self.l1_loss = L1Loss()
+            self.l1_loss_weight = config['loss']['l1_loss']['weight']
+        else:
+            self.l1_loss_weight = 0.
+            
+        # MFCC Loss
+        if 'mfcc' in config['loss'].keys():
+            self.mfcc_loss = MFCCLoss(config['loss']['mfcc'])
+            self.mfcc_loss_weight = config['loss']['mfcc']['weight']
+        else:
+            self.mfcc_loss_weight = 0.
+            
+        # LFCC Loss
+        if 'lfcc' in config['loss'].keys():
+            self.lfcc_loss = LFCCLoss(config['loss']['lfcc'])
+            self.lfcc_loss_weight = config['loss']['lfcc']['weight']
+        else:
+            self.lfcc_loss_weight = 0.
+            
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
         if config['loss']['stft_loss']['use']:
@@ -69,23 +98,49 @@ class LitSepSpeaker(pl.LightningModule):
     def forward(self, mix:Tensor, enr:Tensor) -> Tuple[Tensor, Tensor]:
         return self.model(mix, enr) # est, est_spk, ctc
 
-    def compute_loss(self, estimate, target, estimate_spk, target_spk, valid=False):
+    def compute_loss(self, estimate, target, lengths, estimate_spk, target_spk, valid=False):
         d = {}
         _ce_loss = self.ce_loss(estimate_spk, target_spk)
         _loss = self.ce_loss_weight * _ce_loss
 
-        _l1_loss = self.l1_loss(estimate, target)
-        _loss  += self.l1_loss_weight * _l1_loss
-        
         if valid:
             d['valid_ce_loss'] = _ce_loss
-            d['valid_l1_loss'] = _l1_loss
         else:
             d['train_ce_loss'] = _ce_loss
-            d['train_l1_loss'] = _l1_loss
+        
+        if self.l1_loss_weight > 0.:
+            #with torch.cuda.amp.autocast('cuda', torch.float32):
+            with torch.cuda.amp.autocast():
+                _l1_loss = self.l1_loss(estimate, target, lengths)
+            _loss  += self.l1_loss_weight * _l1_loss
+            if valid:
+                d['valid_l1_loss'] = _l1_loss
+            else:
+                d['train_l1_loss'] = _l1_loss
 
+        if self.mfcc_loss_weight > 0.:
+            #with torch.cuda.amp.autocast('cuda', torch.float32):
+            with torch.cuda.amp.autocast():
+                _mfcc_loss = self.mfcc_loss(estimate, target, lengths)
+            _loss  += self.mfcc_loss_weight * _mfcc_loss
+            if valid:
+                d['valid_mfcc_loss'] = _mfcc_loss
+            else:
+                d['train_mfcc_loss'] = _mfcc_loss
+                
+        if self.lfcc_loss_weight > 0.:
+            #with torch.cuda.amp.autocast('cuda', torch.float32):
+            with torch.cuda.amp.autocast():
+                _lfcc_loss = self.lfcc_loss(estimate, target, lengths)
+            _loss  += self.lfcc_loss_weight * _lfcc_loss
+            if valid:
+                d['valid_lfcc_loss'] = _lfcc_loss
+            else:
+                d['train_lfcc_loss'] = _lfcc_loss
+        
         if self.stft_loss:
-            _stft_loss1, _stft_loss2 = self.stft_loss(estimate, target)
+            with torch.cuda.amp.autocast():
+                _stft_loss1, _stft_loss2 = self.stft_loss(estimate, target)
             _stft_loss = _stft_loss1 + _stft_loss2
             if valid:
                 d['valid_stft_loss'] = _stft_loss
@@ -94,7 +149,8 @@ class LitSepSpeaker(pl.LightningModule):
             _loss += self.stft_loss_weight * _stft_loss
 
         if self.pesq_loss:
-            with torch.cuda.amp.autocast('cuda', torch.float32):
+            #with torch.cuda.amp.autocast('cuda', torch.float32):
+            with torch.cuda.amp.autocast():
                 _pesq_loss = torch.mean(self.pesq(target, estimate))
             if valid:
                 d['valid_pesq_loss'] = _pesq_loss
@@ -103,7 +159,8 @@ class LitSepSpeaker(pl.LightningModule):
             _loss += self.pesq_loss_weight * _pesq_loss
 
         if self.sdr_loss:
-            with torch.cuda.amp.autocast('cuda', torch.float32):
+            with torch.cuda.amp.autocast():
+                #with torch.cuda.amp.autocast('cuda', torch.float32):
                 _sdr_loss = torch.mean(self.sdr_loss(estimate, target))
             if valid:
                 d['valid_sdr_loss'] = _sdr_loss
@@ -112,7 +169,8 @@ class LitSepSpeaker(pl.LightningModule):
             _loss += self.sdr_loss_weight * _sdr_loss
 
         if self.stoi_loss:
-            with torch.cuda.amp.autocast('cuda', torch.float32):
+            #with torch.cuda.amp.autocast('cuda', torch.float32):
+            with torch.cuda.amp.autocast():
                 _stoi_loss = torch.mean(self.stoi_loss(estimate, target))
             if valid:
                 d['valid_stoi_loss'] = _stoi_loss
@@ -139,7 +197,7 @@ class LitSepSpeaker(pl.LightningModule):
             src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
         else:
             src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=False)
+        _loss = self.compute_loss(src_hat, sources, lengths, spk_hat, speakers, valid=False)
 
         if logits is not None:
             valid_lengths = torch.tensor([ self.model.valid_length_ctc(l) for l in lengths ])
@@ -171,7 +229,7 @@ class LitSepSpeaker(pl.LightningModule):
                 valid_lengths = [ self.model.valid_length_ctc(l) for l in lengths ]
         else:
             src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, spk_hat, speakers, valid=True)
+        _loss = self.compute_loss(src_hat, sources, lengths, spk_hat, speakers, valid=True)
 
         return _loss
 

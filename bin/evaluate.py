@@ -34,6 +34,7 @@ def main(args):
     
     assert args.checkpoint is not None
     model = LitSepSpeaker.load_from_checkpoint(args.checkpoint,
+                                               strict=False,
                                                config=config).to(device)
     
     model.eval()
