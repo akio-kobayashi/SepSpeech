@@ -14,27 +14,27 @@ class TSOSLoss(nn.Module):
             window_fn=torch.hamming_window
         )
         
+        self.hop_length = hop_length
         self.p = p
         self.gamma = gamma
 
     def forward(self, preds, targets, lengths):
         
+        total_frames = 0
         mask = torch.zeros_like(preds, dtype=preds.dtype, device=preds.device)
         for b in range(len(preds)):
             mask[b, :, :lengths[b]] = 1.
+            total_frames += int (lengths[b]/self.hop_length) + 1
         preds *= mask
         targets *= mask
         
         preds = self.wav2spec(preds) # (C, F, T)
         targets = self.wav2spec(targets)
-        _, T, _ = preds.shape
 
         p = 0.3
         gamma = 0.1
-        L_os = torch.sum(torch.square(F.relu( torch.pow(source_spec, p) - torch.pow(
-            estimate_spec, p) )), dim=1) # (C, T)
-        L = gamma * torch.sum(torch.pow(source_spec, p), dim=1)
-        tsos = torch.sum(torch.where(L_os - L > 0., 1., 0.))/T
-        tsos = tsos.detach().numpy()
-        return pesq, sdr, stoi, tsos
-    
+        L_os = torch.sum(torch.square(F.relu( torch.pow (preds, p) - torch.pow(targets, p) )), dim=1) # (C, T)
+        L = gamma * torch.sum(torch.pow(preds, p), dim=1)
+        tsos_loss = torch.sum(F.relu(L_os - L)) / total_frames
+
+        return tsos_loss    
