@@ -23,3 +23,4 @@ RUN wget https://github.com/git/git/archive/v${GIT_VERSION}.tar.gz && tar -xzf v
 RUN pip3 install git+https://github.com/openai/whisper.git
 RUN pip3 install git+https://github.com/TeamPyOgg/PyOgg
 RUN pip3 install encodec
+RUN pip3 install onnxruntime
