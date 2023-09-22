@@ -15,16 +15,6 @@ class PLCPA_ASYM(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        '''
-        self.wav2compspec = torchaudio.transforms.Spectrogram(
-            n_fft=config['n_fft'],
-            win_length=config['win_length'],
-            hop_length=config['hop_length'],
-            window_fn=torch.hamming_window,
-            power=None # complex
-        )
-        '''
-        
         self.n_fft=config['n_fft']
         self.win_length=config['win_length']
         self.hop_length=config['hop_length']
@@ -44,19 +34,16 @@ class PLCPA_ASYM(nn.Module):
         preds *= mask
         targets *= mask
         
-        #preds = self.wav2compspec(preds) # (C, F, T)
         preds = complex_stft(preds, self.n_fft, self.hop_length, self.win_length)
         preds_angle = torch.angle(preds)
         preds_abs = torch.pow(torch.abs(preds), self.p)
-        preds = torch.polar(preds_angle, preds_abs)
+        preds = torch.polar(preds_abs, preds_angle)
 
-        #targets = self.wav2compspec(targets)
-        preds = complex_stft(targets, self.n_fft, self.hop_length, self.win_length)
-        targets_angle = torch.angle(preds)
-        targets_abs = torch.pow(torch.abs(preds), self.p)
-        targets = torch.polar(targets_angle, targets_abs)
+        targets = complex_stft(targets, self.n_fft, self.hop_length, self.win_length)
+        targets_angle = torch.angle(targets)
+        targets_abs = torch.pow(torch.abs(targets), self.p)
+        targets = torch.polar(targets_abs, targets_angle)
 
-        '''
         _, N, _ = preds.shape
 
         L_a = torch.sum(torch.square(preds_abs - targets_abs)) / (total_frames * N)
@@ -64,9 +51,10 @@ class PLCPA_ASYM(nn.Module):
         L_os = torch.sum(torch.square(F.relu( preds_abs - targets_abs))) / (total_frames * N)
         '''
         L_a = torch.mean(torch.square(preds_abs - targets_abs)) 
-        L_p = torch.mean(torch.square(torch.abs(preds - targets))) 
+        L_p = torch.mean(torch.square(torch.abs((preds - targets)))) 
         L_os = torch.mean(torch.square(F.relu( preds_abs - targets_abs)))
-        
+        '''
+
         return self.alpha * L_a + (1. - self.alpha) * L_p  + self.beta * L_os
         
 class MultiResPLCPA_ASYM(nn.Module):
