@@ -34,10 +34,10 @@ class PLCPA_ASYM(nn.Module):
         preds *= mask
         targets *= mask
         
-        preds = complex_stft(preds, self.n_fft, self.hop_length, self.win_length)
-        preds_angle = torch.angle(preds)
-        preds_abs = torch.pow(torch.abs(preds), self.p)
-        preds = torch.polar(preds_abs, preds_angle)
+        preds = complex_stft(preds, self.n_fft, self.hop_length, self.win_length) # S
+        preds_angle = torch.angle(preds)                                          # <S
+        preds_abs = torch.pow(torch.abs(preds), self.p)                           # |S|^p
+        preds = torch.polar(preds_abs, preds_angle)                               # |S|^p e^S
 
         targets = complex_stft(targets, self.n_fft, self.hop_length, self.win_length)
         targets_angle = torch.angle(targets)
@@ -46,9 +46,9 @@ class PLCPA_ASYM(nn.Module):
 
         _, N, _ = preds.shape
 
-        L_a = torch.sum(torch.square(preds_abs - targets_abs)) / (total_frames * N)
-        L_p = torch.sum(torch.square(torch.abs(preds - targets))) / (total_frames * N)
-        L_os = torch.sum(torch.square(F.relu( preds_abs - targets_abs)), dim=1)
+        L_a = torch.sum(torch.square(preds_abs - targets_abs)) / (total_frames * N)     # mean (|S|^p - |~S|^p)^2
+        L_p = torch.sum(torch.square(torch.abs(preds - targets))) / (total_frames * N)  # mean (|S|^p e^S - |~S|^p e^~S)^2
+        L_os = torch.sum(torch.square(F.relu( preds_abs - targets_abs)), dim=1)         # (h(|S|^p - |~S|^p))^2
         L_ossum = torch.sum(L_os) / (total_frames * N)
         '''
         L_a = torch.mean(torch.square(preds_abs - targets_abs)) 
@@ -57,7 +57,9 @@ class PLCPA_ASYM(nn.Module):
         '''
 
         L = self.gamma * torch.sum(preds_abs, dim=1)
-        tsos = torch.sum(F.relu(L_os - L)) / (total_frames * N)
+        L_d = L_os - self.gamma * torch.sum(preds_abs, dim=1) 
+        tsos = torch.where(L_d>0, 1., 0.)
+        tsos = torch.sum(tsos) /total_frames
         
         return self.alpha * L_a + (1. - self.alpha) * L_p  + self.beta * L_ossum, tsos
         
