@@ -13,6 +13,7 @@ from loss.stft_loss import MultiResolutionSTFTLoss
 from loss.pesq_loss import PesqLoss
 from loss.sdr_loss import NegativeSISDR
 from loss.stoi_loss import NegSTOILoss
+from loss.plcpa import MultiResPLCPA_ASYM
 from typing import Tuple
 from einops import rearrange
 
@@ -71,7 +72,12 @@ class LitSepSpeaker(pl.LightningModule):
             self.lfcc_loss_weight = config['loss']['lfcc']['weight']
         else:
             self.lfcc_loss_weight = 0.
-            
+
+        # PLCPA Loss
+        if 'plcpa_asym' in config['loss'].keys():
+            self.plcpa_loss = MultiResPLCPA_ASYM(config['loss']['plcpa_asym'])
+            self.plcpa_weight = config['loss']['plcpa_asym']['weight']
+
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
         if config['loss']['stft_loss']['use']:
@@ -127,6 +133,16 @@ class LitSepSpeaker(pl.LightningModule):
                 d['valid_mfcc_loss'] = _mfcc_loss
             else:
                 d['train_mfcc_loss'] = _mfcc_loss
+
+        if self.plcpa_weight > 0.:
+            with torch.cuda.amp.autocast():
+                _plcpa_loss = self.plcpa_loss(estimate, target, lengths)
+                _loss += self.plcpa_weight * _plcpa_loss
+            
+            if valid:
+                d['valid_plcpa_loss'] = _plcpa_loss
+            else:
+                d['train_plcpa_loss'] = _plcpa_loss
                 
         if self.lfcc_loss_weight > 0.:
             #with torch.cuda.amp.autocast('cuda', torch.float32):
