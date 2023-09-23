@@ -1,0 +1,155 @@
+model_type: e3net # tasnet/fast_unet/unet/unet2/e3net
+dataset:
+  process:
+    batch_size: 32
+    num_workers: 2
+  segment:
+    segment: 10
+    enroll_segment: 20
+    sample_rate: 16000
+    random_select: 0.1
+  train:
+    csv_path: '~/SepSpeech/audio/csv/train_3p_phone.csv'
+    enroll_csv_path: '~/SepSpeech/audio/csv/enroll_3p.csv'
+  valid:
+    csv_path: '~/SepSpeech/audio/csv/valid_3p_phone.csv'
+    enroll_csv_path: '~/SepSpeech/audio/csv/enroll_3p.csv'
+  test:
+    csv_path: 
+    enroll_csv_path: 
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 400
+  precision: '16-mixed'
+  profiler: 'simple'
+  gradient_clip_val: 5.
+optimizer:
+  lr: 1.e-4
+logger:
+  save_dir: './e3net'
+  version: 1
+  name: 'lightning_logs'
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_last: True
+  save_top_k: 1
+  mode: 'min'
+  every_n_epochs: 1
+loss:
+  plcpa_asym:
+    n_fft: 512
+    win_length: 400
+    hop_length: 160
+    p: 0.3
+    alpha: 0.5
+    beta: 1.0
+    gamma: 0.1
+    weight: 1.0
+  ce_loss:
+    weight: 0.1
+  l1_loss:
+    weight: 0.
+  mfcc_loss:
+    weight: 0.0
+  lfcc_loss:
+    weight: 0.0
+  stft_loss:
+    use: True
+    weight: 1.0
+  pesq_loss:
+    use: False
+    weight: 1.0
+  sdr_loss:
+    use: False
+    weight: 1.0
+  stoi_loss:
+    use: False
+    weight: 1.0
+speaker:
+  adpt_type: none
+# models
+tasnet:
+  kernel_size: 20
+  in_channels: 256
+  enc_channels: 256
+  conv_channels: 256
+  num_blocks: 6
+  block_kernel_size: 3
+  num_repeats: 4
+  num_speakers: 307
+  resample: 1
+unet: #unet/unet2
+  attention: True
+  normalize: False #True
+  floor: 0.001
+  resample: 1
+  depth: 5
+  in_channels: 512  #1
+  mid_channels: 512 #512 #48
+  out_channels: 512 #1
+  max_channels: 10000
+  kernel_size: 3 #8
+  growth: 1 #2
+  rescale: 0.1
+  stride: 2 #4
+  reference: 0.1
+  causal: True
+  num_speakers: 307
+ctc:
+  use: False
+  weight: 1.0
+  parameters:
+  kernel_size: 8
+  stride: 4
+  padding: 4
+  chout: 256
+  outdim: 41
+e3net:
+  depth: 8
+  encoder:
+    chin: 1
+    chout: 2048
+    kernel_size: 400
+    stride: 160
+    padding: 200
+  decoder:
+    chin: 2048
+    chout: 1
+    kernel_size: 400
+    stride: 160
+    padding: 0
+    output_padding: 0
+  lstm:
+    dim: 1024
+    hidden_dim: 256
+  speaker:
+    chin: 2048
+    chout: 256
+    kernel_size: 3
+    num_speakers: 307
+  concat:
+    x_dim: 2048
+    s_dim: 256
+    output_dim: 256
+  masking:
+    x_dim: 256
+    output_dim: 2048
+emformer:
+  input_dim: 256
+  num_heads: 8
+  ffn_dim: 1024
+  num_layers: 5
+  segment_length: 20
+  dropout: 0.1
+  activation: 'relu'
+  left_context_length: 0
+  right_context_length: 5 
+  max_memory_size: 0
+  tanh_on_mem: False
+sepformer:
+  channels: 256
+  kernel_size: 16
+  stride: 8
+  
