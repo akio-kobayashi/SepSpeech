@@ -136,13 +136,15 @@ class LitSepSpeaker(pl.LightningModule):
 
         if self.plcpa_weight > 0.:
             with torch.cuda.amp.autocast():
-                _plcpa_loss = self.plcpa_loss(estimate, target, lengths)
+                _plcpa_loss, _tsos = self.plcpa_loss(estimate, target, lengths)
                 _loss += self.plcpa_weight * _plcpa_loss
             
             if valid:
                 d['valid_plcpa_loss'] = _plcpa_loss
+                d['valid_tsos'] = _tsos
             else:
                 d['train_plcpa_loss'] = _plcpa_loss
+                d['train_tsos'] = _tsos
                 
         if self.lfcc_loss_weight > 0.:
             #with torch.cuda.amp.autocast('cuda', torch.float32):

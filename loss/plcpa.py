@@ -48,14 +48,18 @@ class PLCPA_ASYM(nn.Module):
 
         L_a = torch.sum(torch.square(preds_abs - targets_abs)) / (total_frames * N)
         L_p = torch.sum(torch.square(torch.abs(preds - targets))) / (total_frames * N)
-        L_os = torch.sum(torch.square(F.relu( preds_abs - targets_abs))) / (total_frames * N)
+        L_os = torch.sum(torch.square(F.relu( preds_abs - targets_abs)), dim=1)
+        L_ossum = torch.sum(L_os) / (total_frames * N)
         '''
         L_a = torch.mean(torch.square(preds_abs - targets_abs)) 
         L_p = torch.mean(torch.square(torch.abs((preds - targets)))) 
         L_os = torch.mean(torch.square(F.relu( preds_abs - targets_abs)))
         '''
 
-        return self.alpha * L_a + (1. - self.alpha) * L_p  + self.beta * L_os
+        L = self.gamma * torch.sum(preds_abs, dim=1)
+        tsos = torch.sum(F.relu(L_os - L)) / (total_frames * N)
+        
+        return self.alpha * L_a + (1. - self.alpha) * L_p  + self.beta * L_ossum, tsos
         
 class MultiResPLCPA_ASYM(nn.Module):
     def __init__(self, config):
@@ -75,7 +79,10 @@ class MultiResPLCPA_ASYM(nn.Module):
 
     def forward(self, preds, targets, lengths):
         _loss = 0.
+        _tsos = 0.
         for func in self.losses:
-            _loss += func(preds.clone(), targets, lengths)
-        return _loss
+            _pls, _ts = func(preds.clone(), targets, lengths)
+            _loss += _pls
+            _tsos += _ts
+        return _loss, _tsos
     
