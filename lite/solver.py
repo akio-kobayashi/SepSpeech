@@ -13,7 +13,7 @@ from loss.stft_loss import MultiResolutionSTFTLoss
 from loss.pesq_loss import PesqLoss
 from loss.sdr_loss import NegativeSISDR
 from loss.stoi_loss import NegSTOILoss
-from loss.plcpa import MultiResPLCPA_ASYM
+from loss.plcpa import MultiResPLCPA_ASYM, PLCPA_ASYM
 from typing import Tuple
 from einops import rearrange
 
@@ -75,7 +75,7 @@ class LitSepSpeaker(pl.LightningModule):
 
         # PLCPA Loss
         if 'plcpa_asym' in config['loss'].keys():
-            self.plcpa_loss = MultiResPLCPA_ASYM(config['loss']['plcpa_asym'])
+            self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
             self.plcpa_weight = config['loss']['plcpa_asym']['weight']
 
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
