@@ -34,21 +34,28 @@ class PLCPA_ASYM(nn.Module):
         preds *= mask
         targets *= mask
         
-        preds = complex_stft(preds, self.n_fft, self.hop_length, self.win_length) # S
-        preds_angle = torch.angle(preds)                                          # <S
-        preds_abs = torch.pow(torch.abs(preds), self.p)                           # |S|^p
-        preds = torch.polar(preds_abs, preds_angle)                               # |S|^p e^S
+        preds = complex_stft(preds, self.n_fft, self.hop_length, self.win_length)  # S
+        #preds_angle = torch.angle(preds)                                          # <S
+        #preds_abs = torch.pow(torch.abs(preds), self.p)                           # |S|^p
+        #preds = torch.polar(preds_abs, preds_angle)                               # |S|^p e^S
+        preds_abs = preds.abs()
+        preds_abs_p = torch.pow(preds_abs, self.p)
 
         targets = complex_stft(targets, self.n_fft, self.hop_length, self.win_length)
-        targets_angle = torch.angle(targets)
-        targets_abs = torch.pow(torch.abs(targets), self.p)
-        targets = torch.polar(targets_abs, targets_angle)
+        #targets_angle = torch.angle(targets)
+        #targets_abs = torch.pow(torch.abs(targets), self.p)
+        #targets = torch.polar(targets_abs, targets_angle)
+        targets_abs = targets.abs()
+        targets_abs_p = torch.pow(targets_abs, self.p)
 
         _, N, _ = preds.shape
 
-        L_a = torch.sum(torch.square(preds_abs - targets_abs)) / (total_frames * N)     # mean (|S|^p - |~S|^p)^2
-        L_p = torch.sum(torch.square(torch.abs(preds - targets))) / (total_frames * N)  # mean (|S|^p e^S - |~S|^p e^~S)^2
-        L_os = torch.sum(torch.square(F.relu( preds_abs - targets_abs)), dim=1)         # (h(|S|^p - |~S|^p))^2
+        return F.mse_loss(preds_abs_p, targets_abs_p, reduction='sum')/(total_frames * N)
+    
+        L_a = torch.sum(torch.square(preds_abs_p - targets_abs_p)) / (total_frames * N)     # mean (|S|^p - |~S|^p)^2
+        L_p = torch.square((preds_abs_p/preds_abs * preds - targets_abs_p /targets_abs * targets).abs())
+        L_p = torch.sum(L_p) / (total_frames * N)  # mean (|S|^p e^S - |~S|^p e^~S)^2
+        L_os = torch.sum(torch.square(F.relu( preds_abs_p - targets_abs_p)), dim=1)         # (h(|S|^p - |~S|^p))^2
         L_ossum = torch.sum(L_os) / (total_frames * N)
         '''
         L_a = torch.mean(torch.square(preds_abs - targets_abs)) 
@@ -56,8 +63,8 @@ class PLCPA_ASYM(nn.Module):
         L_os = torch.mean(torch.square(F.relu( preds_abs - targets_abs)))
         '''
 
-        L = self.gamma * torch.sum(preds_abs, dim=1)
-        L_d = L_os - self.gamma * torch.sum(preds_abs, dim=1) 
+        L = self.gamma * torch.sum(preds_abs_p, dim=1)
+        L_d = L_os - self.gamma * torch.sum(preds_abs_p, dim=1) 
         tsos = torch.where(L_d>0, 1., 0.)
         tsos = torch.sum(tsos) /total_frames
         
