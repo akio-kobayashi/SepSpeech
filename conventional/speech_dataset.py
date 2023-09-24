@@ -236,9 +236,6 @@ def align(source:Tensor, target:Tensor):
         source = source[:, lag:]
         target = target[:, :source.shape[-1]]
 
-    source = rearrange(source, '(c t) -> c t', c=1)
-    target = rearrange(target, '(c t) -> c t', c=1)
-
     return source, target
 
 if __name__ == '__main__':
