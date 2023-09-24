@@ -11,6 +11,8 @@ from torch import Tensor
 import torchaudio
 from augment.opus_augment_simulate import OpusAugment
 from augment.reverb_augment import ReverbAugment
+import scipy.signal as signal
+from einops import rearrange
 
 '''
     音声強調用データの抽出
@@ -83,6 +85,8 @@ class SpeechDataset(torch.utils.data.Dataset):
             if np.random.rand() < self.random_select:
                 mixture = source.detach().clone()
             
+        mixture, source = align(mixture, source)
+        
         return torch.t(mixture), torch.t(source), torch.t(enroll), source_speaker
     
 # On-the-fly ミキシング
@@ -217,6 +221,25 @@ def data_processing(data:Tuple[Tensor,Tensor,Tensor,Tensor]) -> Tuple[Tensor, Te
         enrolls = enrolls.unsqueeze(0)
         
     return mixtures, sources, enrolls, lengths, speakers
+
+def align(source:Tensor, target:Tensor):
+    correlation = signal.correlate(rearrange(target, 'c t -> (c t)').detach().numpy(),
+                                   rearrange(source,'c t -> (c t)').detach().numpy(), mode='full')
+    lags = signal.correlation_lags(target.shape[-1], source.shape[-1], mode='full')
+    lag = lags[np.argmax(correlation)]
+    
+    if lag > 0:
+        target = target[:, lag:]
+        source = source[:, :target.shape[-1]]
+    else:
+        lag = -lag
+        source = source[:, lag:]
+        target = target[:, :source.shape[-1]]
+
+    source = rearrange(source, '(c t) -> c t', c=1)
+    target = rearrange(target, '(c t) -> c t', c=1)
+
+    return source, target
 
 if __name__ == '__main__':
     import argparse
