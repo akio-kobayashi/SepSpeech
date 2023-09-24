@@ -50,7 +50,7 @@ class PLCPA_ASYM(nn.Module):
 
         _, N, _ = preds.shape
 
-        return F.mse_loss(preds_abs_p, targets_abs_p, reduction='sum')/(total_frames * N), 0.0
+        #return F.mse_loss(preds_abs_p, targets_abs_p, reduction='sum')/(total_frames * N), 0.0
     
         L_a = torch.sum(torch.square(preds_abs_p - targets_abs_p)) / (total_frames * N)     # mean (|S|^p - |~S|^p)^2
         L_p = torch.square((preds_abs_p/preds_abs * preds - targets_abs_p /targets_abs * targets).abs())
