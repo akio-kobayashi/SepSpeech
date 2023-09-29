@@ -78,52 +78,61 @@ class LitSepSpeaker(pl.LightningModule):
         else:
             raise ValueError('wrong parameter: '+config['model_type'])
 
-        self.spk_model = X_vector(input_dim=config['xvector']['input_dim'],
-                                  output_dim=config['xvector']['output_dim'])
+        self.spk_model = SpeakerNetwork(config)
+
         # speaker clustering loss
         self.spk_loss = SpeakerLoss(config['xvector']['output_dim'],
                                     config['xvector']['num_speakers'])
         self.spk_loss_weight = config['loss']['speaker']['weight']
 
-        # Mean Absolute Error (temporal domain)
+        self.l1_loss_weight = self.mfcc_loss_weight = self.lfcc_loss_weight = self.plca_weight = 0.
+        # Mean Absolute Error (temporal domain)        
         assert 'l1_loss' in config['loss'].keys()
-        self.l1_loss = L1Loss()
-        self.l1_loss_weight = config['loss']['l1_loss']['weight']
+        if config['loss']['l1_loss']['weight'] > 0.:
+            self.l1_loss = L1Loss()
+            self.l1_loss_weight = config['loss']['l1_loss']['weight']
             
         # MFCC Loss
         assert 'mfcc' in config['loss'].keys()
-        self.mfcc_loss = MFCCLoss(config['loss']['mfcc'])
-        self.mfcc_loss_weight = config['loss']['mfcc']['weight']
+        if config['loss']['mfcc']['weight'] > 0.:
+            self.mfcc_loss = MFCCLoss(config['loss']['mfcc'])
+            self.mfcc_loss_weight = config['loss']['mfcc']['weight']
             
         # LFCC Loss
         assert 'lfcc' in config['loss'].keys()
-        self.lfcc_loss = LFCCLoss(config['loss']['lfcc'])
-        self.lfcc_loss_weight = config['loss']['lfcc']['weight']
+        if config['loss']['lfcc']['weight'] > 0.:
+            self.lfcc_loss = LFCCLoss(config['loss']['lfcc'])
+            self.lfcc_loss_weight = config['loss']['lfcc']['weight']
 
         # PLCPA Loss
         assert 'plcpa_asym' in config['loss'].keys()
-        self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
-        self.plcpa_weight = config['loss']['plcpa_asym']['weight']
+        if config['loss']['plcpa_asym']['weight'] > 0.:
+            self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
+            self.plcpa_weight = config['loss']['plcpa_asym']['weight']
 
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
 
         assert 'stft_loss' in config['loss'].keys()
-        self.stft_loss = MultiResolutionSTFTLoss()
-        self.stft_loss_weight = config['loss']['stft_loss']['weight']
+        if config['loss']['stft_loss']['weight'] > 0.:
+            self.stft_loss = MultiResolutionSTFTLoss()
+            self.stft_loss_weight = config['loss']['stft_loss']['weight']
         
         assert 'pesq_loss' in config['loss'].keys()
-        self.pesq_loss = PesqLoss(factor=1.,
-                                  sample_rate=16000)
-        self.pesq_loss_weight = config['loss']['pesq_loss']['weight']
+        if config['loss']['pesq_loss']['weight'] > 0.:
+            self.pesq_loss = PesqLoss(factor=1.,
+                                      sample_rate=16000)
+            self.pesq_loss_weight = config['loss']['pesq_loss']['weight']
         
         assert 'stoi_loss' in config['loss'].keys()
-        self.stoi_loss = NegSTOILoss()
-        self.stoi_loss_weight = config['loss']['stoi_loss']['weight']
+        if config['loss']['stoi_loss']['weight'] > 0.:
+            self.stoi_loss = NegSTOILoss()
+            self.stoi_loss_weight = config['loss']['stoi_loss']['weight']
 
         assert 'sdr_loss' in config['loss'].keys()
-        self.sdr_loss = NegativeSISDR()
-        self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
+        if config['loss']['sdr_loss']['weight'] > 0.:
+            self.sdr_loss = NegativeSISDR()
+            self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
 
         self.save_hyperparameters()
 
