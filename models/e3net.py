@@ -110,11 +110,11 @@ class MaskingBlock(nn.Module):
         return src*mask
     
 class E3Net(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, spk_net):
         super().__init__()
 
         self.encoder = LearnableEncoder(**config['encoder'])
-        self.speaker_block = SpeakerBlock(**config['speaker'])
+        self.speaker_block = spk_net
         self.concate_block = FeatureConcatBlock(**config['concat'])
 
         block=nn.ModuleList()
@@ -150,10 +150,10 @@ class E3Net(nn.Module):
         # speaker block
         s = s.unsqueeze(1) # B, T -> B, 1, T
         s = self.encoder(s)
-        s, z = self.speaker_block(s)
+        embed = self.speaker_block(s)
 
         y = rearrange(x, 'b c t -> b t c')
-        y = self.concate_block(y, s)
+        y = self.concate_block(y, embed)
 
         # lstm block
         y = self.lstm_block(y)
@@ -168,7 +168,7 @@ class E3Net(nn.Module):
 
         _, output_length = y.shape
         start = (output_length - input_length)//2
-        return y[:, start:start+input_length], z, None
+        return y[:, start:start+input_length], embed
 
 if __name__ == '__main__':
     with open("config.yaml", 'r') as yf:

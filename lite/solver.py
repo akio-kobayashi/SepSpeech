@@ -17,6 +17,20 @@ from loss.plcpa import MultiResPLCPA_ASYM, PLCPA_ASYM
 from typing import Tuple
 from einops import rearrange
 from xvector.adacos import AdaCos
+from models.e3net import LearnableEncoder
+
+class SpeakerNetwork(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.encoder = None
+        if config['model_type'] == 'unet':
+            self.encoder = LearnableEncoder(chhot=config['unet'])
+
+        self.classifier = X_vector()
+        
+    def forward(self, x):
+
 
 class L1Loss(nn.Module):
     def __init__(self):
