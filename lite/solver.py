@@ -18,6 +18,7 @@ from typing import Tuple
 from einops import rearrange
 from xvector.adacos import AdaCos
 from models.e3net import LearnableEncoder
+from xvector.model import X_vector
 
 class SpeakerNetwork(nn.Module):
     def __init__(self, config):
@@ -25,13 +26,18 @@ class SpeakerNetwork(nn.Module):
 
         self.encoder = None
         if config['model_type'] == 'unet':
-            self.encoder = LearnableEncoder(chhot=config['unet'])
+            self.encoder = LearnableEncoder(chhot=config['xvector']['input_dim'])
 
-        self.classifier = X_vector()
+        self.classifier = X_vector(input_dim = config['xvector']['input_dim'],
+                                   output_dim = config['xvector']['output_dim'])
         
     def forward(self, x):
-
-
+        # (b c t)
+        if self.encoder is not None:
+            x = self.encoder(x)
+        x = rearrange(x, 'b c t -> b t c')
+        return self.classifier(x)
+    
 class L1Loss(nn.Module):
     def __init__(self):
         super().__init__()
@@ -214,7 +220,7 @@ class LitSepSpeaker(pl.LightningModule):
     def training_step(self, batch, batch_idx:int) -> Tensor:
         mixtures, sources, enrolls, lengths, speakers = batch
 
-        xvec = self.spk_model(enroll)
+        xvec = self.spk_model(enrolls)
         _spk_loss = self.spk_loss(xvec)
         if self.normalize:
             xvec = F.normalize(xvec)
@@ -231,7 +237,7 @@ class LitSepSpeaker(pl.LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         mixtures, sources, enrolls, lengths, speakers = batch
 
-        xvec = self.spk_model(enroll)
+        xvec = self.spk_model(enrolls)
         _spk_loss = self.spk_loss(xvec)
         if self.normalize:
             xvec = F.normalize(xvec)
