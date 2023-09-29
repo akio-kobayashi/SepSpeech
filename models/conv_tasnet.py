@@ -10,6 +10,7 @@ import argparse
 import yaml
 import math
 import models.unet as unet
+from einops import rearrange
 
 '''
     ConvTasNet
@@ -291,8 +292,8 @@ class ConvTasNet(nn.Module):
         
         self.resample = config['tasnet']['resample']
 
-        self.padding_value = 0
-        self.get_padding_value()
+        #self.padding_value = 0
+        #self.get_padding_value()
 
     def _build_blocks(self, num_blocks, **block_kwargs):
         """
@@ -346,8 +347,8 @@ class ConvTasNet(nn.Module):
 
         # padding
         _, input_length = x.shape
-        if self.padding_value>0:
-            x = self.get_padded_value(x)
+        #if self.padding_value>0:
+        #    x = self.get_padded_value(x)
         #x = F.pad(x, (0, self.valid_length(x.shape[-1]) - x.shape[-1]))
         # upsample
         #x = self.upsample(x)
@@ -370,7 +371,9 @@ class ConvTasNet(nn.Module):
             m = self.non_linear(torch.stack(e, dim=0))
         # spks x [n x N x T]
         s = w * m
-        out = self.decoder_1d(y, squeeze=True)
+        #out = self.decoder_1d(y, squeeze=True)
+        s = rearrange(s, 'c b t f -> (c b ) t f')
+        out = self.decoder_1d(s, squeeze=True)
         if out.dim() == 1: # in case of batch size = 1
             out = torch.unsqueeze(out, 0)
         # downsample
@@ -379,11 +382,14 @@ class ConvTasNet(nn.Module):
         # chopping
         _, output_length = out.shape
         #assert output_length >= input_length
-        start = (output_length - input_length)//2
-        out = out[:, start:start+input_length]
+        if output_length > input_length:
+            out = out[:, :input_length]
+        else:
+            out = F.pad(out, (0, input_length - output_length))
         # spks x n x S
         return out, z, None # dummy
-    
+
+    '''
     def get_padding_value(self):
         start = -1
         end = -1
@@ -404,7 +410,8 @@ class ConvTasNet(nn.Module):
         v = self.padding_value - x.shape[-1] % self.padding_value
         x = torch.nn.functional.pad(x, pad=(1, v), value=0.)
         return x
-        
+    '''
+    
 def count_parameters(model):
     return sum(param.numel() for param in model.parameters() if param.requires_grad)
 
