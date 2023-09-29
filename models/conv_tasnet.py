@@ -10,6 +10,7 @@ import argparse
 import yaml
 import math
 import models.unet as unet
+from einops import rearrange
 
 '''
     ConvTasNet
@@ -221,7 +222,8 @@ class ConvTasNet(nn.Module):
         P: config['tasnet']['block_kernel_size'] = 3
         R: config['tasnet']['num_repeats'] =4
     '''
-    def __init__(self,config,
+    def __init__(self,config, 
+                 spk_net,
                  norm="cLN",
                  non_linear="relu",
                  causal=False):
@@ -260,11 +262,12 @@ class ConvTasNet(nn.Module):
             causal=causal)
         spk_encoder = Encoder(config['tasnet']['in_channels'],
                               config['tasnet']['kernel_size'])
-        self.spk_net = SpeakerNetwork(spk_encoder,
-                                      config['tasnet']['in_channels'],
-                                      config['tasnet']['in_channels'],
-                                      config['tasnet']['block_kernel_size'],
-                                      config['tasnet']['num_speakers'])
+        #self.spk_net = SpeakerNetwork(spk_encoder,
+        #                              config['tasnet']['in_channels'],
+        #                              config['tasnet']['in_channels'],
+        #                              config['tasnet']['block_kernel_size'],
+        #                              config['tasnet']['num_speakers'])
+        self.spk_net = spk_net
         self.adpt = SpeakerAdaptationLayer(config['speaker']['adpt_type'])
         self.repeats = self._build_repeats(
             config['tasnet']['num_repeats']-1,
@@ -290,9 +293,6 @@ class ConvTasNet(nn.Module):
             stride=config['tasnet']['kernel_size'] // 2, bias=True)
         
         self.resample = config['tasnet']['resample']
-
-        self.padding_value = 0
-        self.get_padding_value()
 
     def _build_blocks(self, num_blocks, **block_kwargs):
         """
@@ -346,20 +346,17 @@ class ConvTasNet(nn.Module):
 
         # padding
         _, input_length = x.shape
-        if self.padding_value>0:
-            x = self.get_padded_value(x)
-        #x = F.pad(x, (0, self.valid_length(x.shape[-1]) - x.shape[-1]))
-        # upsample
-        #x = self.upsample(x)
-
+        
         # n x 1 x S => n x N x T
         w = F.relu(self.encoder_1d(x))
         # n x B x T
         y = self.proj(self.ln(w))
         # n x B x T
         y = self.first_block(y)
-        spk, z = self.spk_net(s)
-        y = self.adpt(y, spk)
+        # speaker
+        s = self.encoder_1d(s)
+        embed = self.spk_net(s)
+        y = self.adpt(y, embed)
         y = self.repeats(y)
         # n x 2N x T
         e = torch.chunk(self.mask(y), 1, 1)
@@ -370,7 +367,9 @@ class ConvTasNet(nn.Module):
             m = self.non_linear(torch.stack(e, dim=0))
         # spks x [n x N x T]
         s = w * m
-        out = self.decoder_1d(y, squeeze=True)
+        #out = self.decoder_1d(y, squeeze=True)
+        s = rearrange(s, 'c b t f -> (c b ) t f')
+        out = self.decoder_1d(s, squeeze=True)
         if out.dim() == 1: # in case of batch size = 1
             out = torch.unsqueeze(out, 0)
         # downsample
@@ -379,32 +378,13 @@ class ConvTasNet(nn.Module):
         # chopping
         _, output_length = out.shape
         #assert output_length >= input_length
-        start = (output_length - input_length)//2
-        out = out[:, start:start+input_length]
+        if output_length > input_length:
+            out = out[:, :input_length]
+        else:
+            out = F.pad(out, (0, input_length - output_length))
         # spks x n x S
-        return out, z, None # dummy
-    
-    def get_padding_value(self):
-        start = -1
-        end = -1
-        s = torch.rand(4, 1000)
-        with torch.no_grad():
-            for n in range(1000, 1100):
-                x = torch.rand(4, n)
-                o, _, _ = self.forward(x, s)
-                if x.shape[-1] == o.shape[-1]:
-                    if start < 0:
-                        start = n
-                    else:
-                        end = n
-                        break
-        self.padding_value = end - start
-
-    def get_padded_value(self, x):
-        v = self.padding_value - x.shape[-1] % self.padding_value
-        x = torch.nn.functional.pad(x, pad=(1, v), value=0.)
-        return x
-        
+        return out, embed
+ 
 def count_parameters(model):
     return sum(param.numel() for param in model.parameters() if param.requires_grad)
 

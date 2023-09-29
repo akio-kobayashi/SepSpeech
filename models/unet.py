@@ -9,7 +9,6 @@ import torch.nn as nn
 from torch import Tensor
 import math
 from einops import rearrange
-from models.ctc import CTCBlock
 
 class PositionEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=3000):
@@ -52,45 +51,6 @@ class ConcatBlock(nn.Module):
         y = rearrange(y, 'b t c -> b c t')
         return x + y
     
-class MergeBlock(nn.Module):
-    def __init__(self, in_channels:int, aux_channels:int, out_channels:int) -> None:
-        super().__init__()
-        #self.pos_enc = PositionEncoding(aux_channels, max_len=640000)
-        #self.linear = nn.Linear(in_channels+aux_channels, out_channels, bias=False)
-        
-    def forward(self, x:Tensor,  s:Tensor):
-        # factoring
-        return x * rearrange(s, 'b (c t) -> b c t', t=1)
-        #B, C, T = x.shape
-        #s = self.pos_enc(rearrange(s, 'b (c t) -> b c t', t=1).repeat((1, 1, T)))
-        #y = torch.concat([x, s], dim=-1)
-        #z = self.linear(rearrange(y, 'b c t -> b t c'))
-        #z = rearrnage(z, 'b t c -> b c t')
-        #return x+z
-    
-class SpeakerNetwork(nn.Module):
-    def __init__(self, encoder, in_channels:int, out_channels:int, kernel_size:int, num_speakers:int) -> None:
-        super().__init__()
-        self.encoder = encoder
-        self.conv = nn.Conv1d(
-            in_channels,      # 256
-            out_channels,
-            kernel_size,      # 16
-            1,
-            kernel_size//2, # padding
-            1
-        )
-        self.act = nn.ReLU()
-        self.linear=nn.Linear(out_channels, num_speakers)
-
-    def forward(self, x:torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
-        # tensor: (b c t)
-        y = self.encoder(x)
-        y = self.conv(y)
-        y = torch.mean(y, dim=-1) # (B, C)
-        z = self.linear(self.act(y)) # (B, S)
-        return y, z
-
 class TFEncoder(nn.Module):
     def __init__(self, dim, n_layers=5, n_heads=8):
         super(TFEncoder, self).__init__()
@@ -228,7 +188,7 @@ class DecoderBlock(nn.Module):
         return self.block(x)
 
 class UNet(nn.Module):
-    def __init__(self, config:dict) -> None:
+    def __init__(self, config:dict, spk_net) -> None:
         super().__init__()
         self.normalize = config['unet']['normalize']
         self.floor = config['unet']['floor']
@@ -258,22 +218,10 @@ class UNet(nn.Module):
             ]
             self.encoder.append(nn.Sequential(*encode))
 
-            #transf = []
-            #transf += [
-            #    nn.ReLU(),
-            #    nn.Linear(mid_channels, mid_channels)
-            #]
-            #self.transform.append(nn.Sequential(*transf))
             self.transform.append(ConcatBlock(mid_channels,
                                               mid_channels,
                                               mid_channels)
                                   )
-            #transf_d = []
-            #transf_d += [
-                #nn.ReLU(),
-                #nn.Linear(mid_channels, mid_channels)
-                #]
-            #self.transform_d.append(nn.Sequential(*transf_d))
 
             decode = []
             decode += [
@@ -301,27 +249,7 @@ class UNet(nn.Module):
             rescale_module(self, reference=reference)
         from models.sepformer import Encoder
 
-        spk_encoder = nn.Sequential(
-            nn.Conv1d(config['unet']['in_channels'],
-                      config['unet']['mid_channels'],
-                      self.kernel_size,
-                      self.stride),
-            nn.ReLU(),
-            nn.Conv1d(config['unet']['mid_channels'],
-                      config['unet']['mid_channels'],
-                      1),
-            nn.ReLU()
-        )
-        
-        self.speaker = SpeakerNetwork(spk_encoder,
-                                      config['unet']['mid_channels'],
-                                      config['unet']['mid_channels'],
-                                      config['unet']['kernel_size'],
-                                      config['unet']['num_speakers'])
-  
-        self.ctc_block=None        
-        if config['ctc']['use']:
-            self.ctc_block = CTCBlock(config['ctc']['parameters'])
+        self.speaker = spk_net
 
     def valid_length(self, length):
         length = math.ceil(length * self.resample)
@@ -331,11 +259,6 @@ class UNet(nn.Module):
         for idx in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
         length = int(math.ceil(length/self.resample))
-        return int(length)
-    
-    def valid_length_ctc(self, length):
-        length = self.valid_length(length)
-        length = self.ctc_block.valid_length(length)
         return int(length)
     
     @property
@@ -363,13 +286,10 @@ class UNet(nn.Module):
             x = upsample2(x)
             x = upsample2(x)
         skips = []
-        enc_s, y = None,None
-        if enr is not None:
-            enc_s, y = self.speaker(enr)
+        embed = self.speaker(enr)
         for n, [encode, transform] in enumerate(zip(self.encoder, self.transform)):
             x = encode(x)
-            if enc_s is not None:
-                x = transform(x, enc_s)
+            x = transform(x, embed)
             skips.append(x)
         if self.lstm is not None:
             x = x.permute(2, 0, 1) # (b c t) -> (t b c)
@@ -384,16 +304,7 @@ class UNet(nn.Module):
         for decode in self.decoder:
             skip = skips.pop(-1)
             x = x + skip[...,:x.shape[-1]]
-            #if enc_s is not None:
-            #    x = rearrange(x, 'b c t -> b t c')
-            #    x = transform(x)
-            #    x = rearrange(x, 'b t c -> b c t')
-            #    x = self.adpt(x, enc_s)
             x = decode(x)
-
-        z = None
-        if self.ctc_block is not None:
-            z = self.ctc_block(x)
             
         if self.resample == 2:
             x = downsample2(x)
@@ -405,5 +316,5 @@ class UNet(nn.Module):
             x = x[..., :length]
         else:
             x = x[..., :length]
-        return std * x, y, z
+        return std * x, embed
         
