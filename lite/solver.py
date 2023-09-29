@@ -16,6 +16,7 @@ from loss.stoi_loss import NegSTOILoss
 from loss.plcpa import MultiResPLCPA_ASYM, PLCPA_ASYM
 from typing import Tuple
 from einops import rearrange
+from xvector.adacos import AdaCos
 
 class L1Loss(nn.Module):
     def __init__(self):
@@ -25,9 +26,18 @@ class L1Loss(nn.Module):
     def forward(self, preds, targets, lengths):
         mask = torch.zeros_like(preds, dtype=preds.dtype, device=preds.device)
         for b in range(len(preds)):
-            mask[:, :lengths[b]] = 1.
+            mask[b, :lengths[b]] = 1.
         return self.loss(preds * mask, targets * mask) / torch.sum(mask)
-    
+
+class SpeakerLoss(nn.Module):
+    def __init__(self, xvec_dim, num_speakers):
+        self.metric = AdaCos(xvec_dim, num_speakers)
+        self.loss = nn.CrossEntropyLoss()
+        
+    def forward(self, xvec, speakers):
+        _metric, _ = self.metric(x_vec, speakers)
+        return self.loss(_metric, speakers)
+        
 '''
  PyTorch Lightning 用 solver
 '''
@@ -48,71 +58,60 @@ class LitSepSpeaker(pl.LightningModule):
         else:
             raise ValueError('wrong parameter: '+config['model_type'])
 
-        # clustering loss
-        self.ce_loss = nn.CrossEntropyLoss(reduction='sum')
-        self.ce_loss_weight = config['loss']['ce_loss']['weight']
+        self.spk_model = X_vector(input_dim=config['xvector']['input_dim'],
+                                  output_dim=config['xvector']['output_dim'])
+        # speaker clustering loss
+        self.spk_loss = SpeakerLoss(config['xvector']['output_dim'],
+                                    config['xvector']['num_speakers'])
+        self.spk_loss_weight = config['loss']['speaker']['weight']
 
         # Mean Absolute Error (temporal domain)
-        if 'l1_loss' in config['loss'].keys():
-            self.l1_loss = L1Loss()
-            self.l1_loss_weight = config['loss']['l1_loss']['weight']
-        else:
-            self.l1_loss_weight = 0.
+        assert 'l1_loss' in config['loss'].keys()
+        self.l1_loss = L1Loss()
+        self.l1_loss_weight = config['loss']['l1_loss']['weight']
             
         # MFCC Loss
-        if 'mfcc' in config['loss'].keys():
-            self.mfcc_loss = MFCCLoss(config['loss']['mfcc'])
-            self.mfcc_loss_weight = config['loss']['mfcc']['weight']
-        else:
-            self.mfcc_loss_weight = 0.
+        assert 'mfcc' in config['loss'].keys()
+        self.mfcc_loss = MFCCLoss(config['loss']['mfcc'])
+        self.mfcc_loss_weight = config['loss']['mfcc']['weight']
             
         # LFCC Loss
-        if 'lfcc' in config['loss'].keys():
-            self.lfcc_loss = LFCCLoss(config['loss']['lfcc'])
-            self.lfcc_loss_weight = config['loss']['lfcc']['weight']
-        else:
-            self.lfcc_loss_weight = 0.
+        assert 'lfcc' in config['loss'].keys()
+        self.lfcc_loss = LFCCLoss(config['loss']['lfcc'])
+        self.lfcc_loss_weight = config['loss']['lfcc']['weight']
 
         # PLCPA Loss
-        if 'plcpa_asym' in config['loss'].keys():
-            self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
-            self.plcpa_weight = config['loss']['plcpa_asym']['weight']
+        assert 'plcpa_asym' in config['loss'].keys()
+        self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
+        self.plcpa_weight = config['loss']['plcpa_asym']['weight']
 
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
-        if config['loss']['stft_loss']['use']:
-            self.stft_loss = MultiResolutionSTFTLoss()
-            self.stft_loss_weight = config['loss']['stft_loss']['weight']
-        if config['loss']['pesq_loss']['use']:
-            self.pesq_loss = PesqLoss(factor=1.,
-                                      sample_rate=16000)
-            self.pesq_loss_weight = config['loss']['pesq_loss']['weight']
-        if config['loss']['stoi_loss']['use']:
-            self.stoi_loss = NegSTOILoss()
-            self.stoi_loss_weight = config['loss']['stoi_loss']['weight']
-        if config['loss']['sdr_loss']['use']:
-            self.sdr_loss = NegativeSISDR()
-            self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
 
-        self.ctc_loss=None
-        if config['ctc']['use']:
-            self.ctc_loss = nn.CTCLoss()
-            self.ctc_weight = config['ctc']['weight']
+        assert 'stft_loss' in config['loss'].keys()
+        self.stft_loss = MultiResolutionSTFTLoss()
+        self.stft_loss_weight = config['loss']['stft_loss']['weight']
+        
+        assert 'pesq_loss' in config['loss'].keys()
+        self.pesq_loss = PesqLoss(factor=1.,
+                                  sample_rate=16000)
+        self.pesq_loss_weight = config['loss']['pesq_loss']['weight']
+        
+        assert 'stoi_loss' in config['loss'].keys()
+        self.stoi_loss = NegSTOILoss()
+        self.stoi_loss_weight = config['loss']['stoi_loss']['weight']
+
+        assert 'sdr_loss' in config['loss'].keys()
+        self.sdr_loss = NegativeSISDR()
+        self.sdr_loss_weight = config['loss']['sdr_loss']['weight']
 
         self.save_hyperparameters()
 
-    def forward(self, mix:Tensor, enr:Tensor) -> Tuple[Tensor, Tensor]:
-        return self.model(mix, enr) # est, est_spk, ctc
+    def forward(self, mix:Tensor, embed:Tensor) -> Tuple[Tensor, Tensor]:
+        return self.model(mix, embed) # return src_hat
 
-    def compute_loss(self, estimate, target, lengths, estimate_spk, target_spk, valid=False):
+    def compute_loss(self, estimate, target, lengths, valid=False):
         d = {}
-        _ce_loss = self.ce_loss(estimate_spk, target_spk)
-        _loss = self.ce_loss_weight * _ce_loss
-
-        if valid:
-            d['valid_ce_loss'] = _ce_loss
-        else:
-            d['train_ce_loss'] = _ce_loss
         
         if self.l1_loss_weight > 0.:
             #with torch.cuda.amp.autocast('cuda', torch.float32):
@@ -156,7 +155,7 @@ class LitSepSpeaker(pl.LightningModule):
             else:
                 d['train_lfcc_loss'] = _lfcc_loss
         
-        if self.stft_loss:
+        if self.stft_loss_weight > 0.:
             with torch.cuda.amp.autocast():
                 _stft_loss1, _stft_loss2 = self.stft_loss(estimate, target)
             _stft_loss = _stft_loss1 + _stft_loss2
@@ -166,7 +165,7 @@ class LitSepSpeaker(pl.LightningModule):
                 d['train_stft_loss'] = _stft_loss
             _loss += self.stft_loss_weight * _stft_loss
 
-        if self.pesq_loss:
+        if self.pesq_loss_weight > 0.:
             #with torch.cuda.amp.autocast('cuda', torch.float32):
             with torch.cuda.amp.autocast():
                 _pesq_loss = torch.mean(self.pesq(target, estimate))
@@ -176,7 +175,7 @@ class LitSepSpeaker(pl.LightningModule):
                 d['train_pesq_loss'] = _pesq_loss
             _loss += self.pesq_loss_weight * _pesq_loss
 
-        if self.sdr_loss:
+        if self.sdr_loss_weight > 0.:
             with torch.cuda.amp.autocast():
                 #with torch.cuda.amp.autocast('cuda', torch.float32):
                 _sdr_loss = torch.mean(self.sdr_loss(estimate, target))
@@ -186,7 +185,7 @@ class LitSepSpeaker(pl.LightningModule):
                 d['train_sdr_loss'] = _sdr_loss
             _loss += self.sdr_loss_weight * _sdr_loss
 
-        if self.stoi_loss:
+        if self.stoi_loss_weight > 0.:
             #with torch.cuda.amp.autocast('cuda', torch.float32):
             with torch.cuda.amp.autocast():
                 _stoi_loss = torch.mean(self.stoi_loss(estimate, target))
@@ -196,72 +195,43 @@ class LitSepSpeaker(pl.LightningModule):
                 d['train_stoi_loss'] = _stoi_loss
             _loss += self.stoi_loss_weight * _stoi_loss
 
-        if valid:
-            d['valid_loss'] = _loss
-        else:
-            d['train_loss'] = _loss
-        self.log_dict(d)
-
         return _loss
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
-        if self.ctc_loss is None:
-            mixtures, sources, enrolls, lengths, speakers = batch
-        else:
-            mixtures, sources, enrolls, lengths, speakers, labels, target_lengths = batch
+        mixtures, sources, enrolls, lengths, speakers = batch
 
-        logits = None
-        if self.config['model_type'] == 'unet':
-            src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
-        else:
-            src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, lengths, spk_hat, speakers, valid=False)
+        xvec = self.spk_model(enroll)
+        _spk_loss = self.spk_loss(xvec)
+        if self.normalize:
+            xvec = F.normalize(xvec)
+            
+        src_hat = self.model(sources, xvec)
+        _loss = self.compute_loss(src_hat, sources, lengths, valid=False)
+        _loss += self.spk_loss_weight * _spk_loss
 
-        if logits is not None:
-            valid_lengths = torch.tensor([ self.model.valid_length_ctc(l) for l in lengths ])
-            target_lengths = torch.tensor(target_lengths)
-            logprobs = F.log_softmax(logits)
-            logprobs = rearrange('b t c -> t b c')
-            with torch.cuda.amp.autocast('cuda', torch.float32):
-                _loss += self.ctc_weight * self.ctc_loss(logprobs, valid_lengths, target_lengths)
-
+        self.log_dict({'train_loss': _loss})
+        self.log_dict({'train_speaker_loss': _spk_loss})
+        
         return _loss
-
-    '''
-    def train_epoch_end(outputs:Tensor):
-        #agv_loss = torch.stack([x['loss'] for x in outputs]).mean()
-        #tensorboard_logs={'loss': agv_loss}
-        #return {'avg_loss': avg_loss, 'log': tensorboard_logs}
-    '''
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        if self.ctc_loss is None:
-            mixtures, sources, enrolls, lengths, speakers = batch
-        else:
-            mixtures, sources, enrolls, lengths, speakers, labels, target_lengths = batch
+        mixtures, sources, enrolls, lengths, speakers = batch
 
-        logits = None
-        if self.config['model_type'] == 'unet':
-            src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
-            if self.ctc_loss is not None:
-                valid_lengths = [ self.model.valid_length_ctc(l) for l in lengths ]
-        else:
-            src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, lengths, spk_hat, speakers, valid=True)
+        xvec = self.spk_model(enroll)
+        _spk_loss = self.spk_loss(xvec)
+        if self.normalize:
+            xvec = F.normalize(xvec)
+        
+        src_hat = self.model(sources, xvec)
+        _loss = self.compute_loss(src_hat, sources, lengths, valid=False)
+        _loss += self.spk_loss_weight * _spk_loss
 
+        self.log_dict({'valid_loss': _loss})
+        self.log_dict({'valid_speaker_loss': _spk_loss})
+        
         return _loss
 
-    '''
-    def on_validation_epoch_end(outputs:Tensor):
-        #agv_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        #tensorboard_logs={'val_loss': agv_loss}
-        #return {'avg_loss': avg_loss, 'log': tensorboard_logs}
-    '''
-    
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
                                      **self.config['optimizer'])
         return optimizer
-    
-    def get_model(self):
-        return self.model
