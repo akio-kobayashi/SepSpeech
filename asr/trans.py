@@ -66,7 +66,8 @@ class UpSampler(nn.Module):
         # (length - 1) * 3 -2*6//2 + 5 + 1 
         #length = (length - 1) * self.stride -2 * self.padding + (self.kernel_size - 1) + self.output_padding + 1
         return self.factor * length
-        
+
+@torch.compile        
 class TransTransducer(nn.Module):
     def __init__(self, device,
                  input_vocab_size,
