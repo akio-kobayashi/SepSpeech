@@ -100,7 +100,7 @@ def decode(network, device, test_loader, tokenizer, output_tokenizer, outpath, b
                 xs = network.ff_encoder(input_labels)
                 for j in range(xs.shape[0]):
                     if beam_search:
-                        pred, logp = network.beam_search(torch.unsqueeze(xs[j],0), ff=False)
+                        pred, logp = network.beam_search(torch.unsqueeze(xs[j],0))
                     else:
                         pred, logp = network.greedy_decode(torch.unsqueeze(xs[j],0), ff=False)
 

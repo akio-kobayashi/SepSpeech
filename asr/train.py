@@ -15,6 +15,7 @@ import argparse
 from asr_tokenizer import ASRTokenizer
 import yaml
 import warnings
+from early_stop import EarlyStopping
 
 warnings.simplefilter('ignore')
 os.environ['TOKENIZERS_PARALLELISM']='true'
@@ -29,7 +30,7 @@ def main():
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
 
-    tokenizer = ASRTokenizer(config['dataset']['tokenizer'], ctc_decode=True)
+    tokenizer = ASRTokenizer(config['dataset']['tokenizer'], ctc_decode=True, insert_space=config['dataset']['insert_space'])
     
     writer = SummaryWriter(log_dir=config['logger']['save_dir'])
     if not os.path.exists(config['logger']['save_dir']):
@@ -45,18 +46,18 @@ def main():
 
     shuffle = False if config['analysis']['sort_by_len'] is True else False
     
-    train_dataset=SpeechDataset(config['dataset']['train']['csv_path'], config, 20, tokenizer)
+    train_dataset=SpeechDataset(config['dataset']['train']['csv_path'], config, 20, tokenizer, specaug=config['augment']['specaug'])
     train_loader =data.DataLoader(dataset=train_dataset,
                                   batch_size=config['dataset']['process']['batch_size'],
                                   shuffle=shuffle,
                                   collate_fn=lambda x: generator.data_processing(x,'train'),
                                   **kwargs)
-    valid_dataset=SpeechDataset(config['dataset']['valid']['csv_path'], config, 20, tokenizer)
+    valid_dataset=SpeechDataset(config['dataset']['valid']['csv_path'], config, 20, tokenizer, specaug=False)
     valid_loader=data.DataLoader(dataset=valid_dataset,
                                  batch_size=config['dataset']['process']['batch_size'],
                                  shuffle=shuffle,
                                  collate_fn=lambda x: generator.data_processing(x, 'valid'))
-    eval_dataset=SpeechDataset(config['dataset']['test']['csv_path'], config, 20, tokenizer)
+    eval_dataset=SpeechDataset(config['dataset']['test']['csv_path'], config, 20, tokenizer, specaug=False)
     eval_loader=data.DataLoader(dataset=eval_dataset,
                                 batch_size=1,
                                 shuffle=False,
@@ -93,11 +94,15 @@ def main():
         yaml.dump(config, f)
         
     iter_meter=IterMeter()
-    min_cer=100.0
+    es=EarlyStopping(verbose=True, path=os.path.join(model_dir, config['model_output']))
     for epoch in range(1, config['max_epochs']+1):
         solver.train(network, device, train_loader, optimizer, scheduler,
                         epoch, iter_meter, writer)
-        avg_cer = solver.test(network, device, valid_loader, epoch, iter_meter, writer)
+        val_cer = solver.test(network, device, valid_loader, epoch, iter_meter, writer)
+        if es(val_cer, network.to('cpu')):
+            break
+        network.to(device)
+        '''
         if avg_cer < min_cer:
             min_cer = avg_cer
             print(f'Minimum CER changed to {min_cer:.3f}')
@@ -105,14 +110,16 @@ def main():
             path = os.path.join(model_dir, config['model_output'])
             torch.save(network.to('cpu').state_dict(), path)
             network.to(device)
-        path=f'checkpoint_epoch={epoch}_cer={avg_cer:.3f}'
+        '''
+        path=f'checkpoint_epoch={epoch}_cer={val_cer:.3f}'
         path=os.path.join(model_dir, path)
         torch.save(network.to('cpu').state_dict(), path)
         network.to(device)
 
-    path = os.path.join(model_dir, config['model_output'])
-    network.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
     network.to(device)
+    #path = os.path.join(model_dir, config['model_output'])
+    #network.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
+    #network.to(device)
     path = os.path.join(model_dir, config['decode_output'])
 
     with torch.no_grad():

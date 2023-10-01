@@ -4,10 +4,9 @@ import random
 import torch
 import torch.nn as nn
 import pandas as pd
-import torchaudio
+#import torchaudio
 from asr_tokenizer import ASRTokenizer
 import yaml
-
 
 class TextDataset(torch.utils.data.Dataset):
 
@@ -33,7 +32,7 @@ class TextDataset(torch.utils.data.Dataset):
         if self.output_tokenizer == None:
             self.output_tokenizer = ASRTokenizer(config['dataset']['output_tokenizer'],
                                                  config['dataset']['output_max_length'])
-            
+        
     def __len__(self):
         return len(self.df)
 
@@ -70,6 +69,9 @@ class TextDataset(torch.utils.data.Dataset):
         max_len = len(self.df)
         remove_indices = []
         for index, row in self.df.iterrows():
+            input_length = row['input_length']
+            output_length = row['output_length']
+            '''
             input_length = output_length = 0
             with open(row['input_label'], 'r') as  f:
                 line = f.readline().strip()
@@ -79,7 +81,7 @@ class TextDataset(torch.utils.data.Dataset):
                 line = f.readline().strip()
                 line = re.sub(self.pattern, '', line)
                 output_length = len(list(line))
-
+            '''
             if input_length == 0 or output_length == 0:
                 remove_indices.append(index)
             if self.upsample * input_length < output_length:
@@ -122,12 +124,18 @@ if __name__=="__main__":
     with open('config.yaml', 'r') as yf:
         config =  yaml.safe_load(yf)
         
-    tokenizer=ASRTokenizer(config['dataset']['tokenizer'])
-    tokenizer=ASRTokenizer(config['dataset']['output_tokenizer'])
+    tokenizer=ASRTokenizer(config['dataset']['tokenizer'], insert_space=False)
+    output_tokenizer=ASRTokenizer(config['dataset']['output_tokenizer'])
     
     dataset=TextDataset(config['dataset']['train']['csv_path'],
                         config,
                         tokenizer,
                         output_tokenizer
                         )
+    
+    input_label, output_label, key = dataset.__getitem__(100)
+    input_str=tokenizer.token2text_raw(input_label)
+    output_str=output_tokenizer.token2text_raw(output_label)
+    print(input_str)
+    print(output_str)
     

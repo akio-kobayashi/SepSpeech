@@ -5,7 +5,7 @@ from typing import Tuple, List
 import re
 
 class ASRTokenizer():
-    def __init__(self, path, max_length=256, ctc_decode=False):
+    def __init__(self, path, max_length=512, ctc_decode=False, insert_space=True):
         super().__init__()
         special_tokens = ["<blk>","<s>", "</s>", "<pad>", "<unk>", "<cls>", "<sep>", "<mask>"]
         self.tokenizer = transformers.PreTrainedTokenizerFast(tokenizer_file=path,
@@ -28,40 +28,40 @@ class ASRTokenizer():
         self.punct = re.compile(r"⠲$")
         self.space1 = re.compile(r"^\ ")
         self.space2 = re.compile(r"\ $")
+
+        self.insert_space = insert_space
         
     def text2token(self, text) -> List[int]:
         text = re.sub(self.punct, '', text)
-        text = self.tokenizer.bos_token + ' ' + text + ' '+self.tokenizer.eos_token
+        if self.insert_space:
+            text = self.tokenizer.bos_token + ' ' + text + ' '+self.tokenizer.eos_token
+        else:
+            text = self.tokenizer.bos_token + text + self.tokenizer.eos_token
+            
         return self.tokenizer.encode(text)
 
     def token2text_raw(self, token) -> str:
         return self.tokenizer.decode(token)
-    
-    def token2text(self, token) -> str:
-        if self.ctc_decode:
-            rmvd = []
-            prv_id = -1
-            for id in token:
-                if prv_id == id:
-                    continue
-                prv_id = id
-                if id == self.tokenizer.bos_token_id or id == self.tokenizer.eos_token_id:
-                    continue
-                if id == self.tokenizer.blank_token_id:
-                    continue
-                if id < 8:
-                    continue
-                rmvd.append(id)
-                prv_id = id
 
-            text = self.tokenizer.decode(rmvd)
+    def remove(self, seq):
+        temp = []
+        prv_id = -1
+        for id in seq:
+            if prv_id == id:
+                continue
+            prv_id = id
+            temp.append(id)
+        return temp
+            
+    def token2text(self, token) -> str:
+        max_token_id = 7
+        if self.ctc_decode:
+            temp = self.remove(token)
+            token = [t for t in temp if t > max_token_id]
+            text = self.tokenizer.decode(token)
         else:
-            rmvd = []
-            for id in token:
-                if id == self.tokenizer.bos_token_id or id == self.tokenizer.eos_token_id:
-                    continue
-                rmvd.append(id)
-            text = self.tokenizer.decode(rmvd)
+            temp = [ t for t in token if t > max_token_id]
+            text = self.tokenizer.decode(temp)
         text = re.sub(self.space1, '', text)
         text = re.sub(self.space2, '', text)
         

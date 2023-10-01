@@ -98,12 +98,12 @@ class TransTransducer(nn.Module):
 
         # NOTE encoder & decoder only use lstm
         # instead of RNN, just use conformer block
-        encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads, self.dim_feedforward)
+        encoder_layer = nn.TransformerEncoderLayer(self.hidden_size, self.num_heads, self.dim_feedforward, batch_first=True)
         self.encoder = nn.TransformerEncoder(encoder_layer, self.num_layers)
         self.input_embed = nn.Embedding(self.input_vocab_size, embed_size)
         self.upsampler = UpSampler(embed_size, hidden_size, factor=self.upsample, 
-                                   kernel_size=5, padding=5//2)
-        self.input_pos_embed = PositionEncoding(hidden_size, max_len=2048)
+                                   kernel_size=3, padding=3//2)
+        self.input_pos_embed = PositionEncoding(hidden_size, max_len=1024)
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
 
         self.downsampler=None
@@ -184,8 +184,9 @@ class TransTransducer(nn.Module):
             x = self.encoder(x)
             x = self.fc0(x)
 
-        #vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
-        vy = torch.LongTensor([self.bos_token]).view(1,1)
+        vy = autograd.Variable(torch.LongTensor([0]), volatile=True).view(1,1)
+        #vy = torch.LongTensor([self.bos_token]).view(1,1)
+        #vy = torch.LongTensor([0]).view(1,1)
         # vector preserve for embedding
         if x.is_cuda: vy = vy.cuda()
         y, h = self.decoder(self.embed(vy)) # decode first zero
@@ -285,6 +286,72 @@ class TransTransducer(nn.Module):
         # return highest probability sequence
         return B[0].k, -B[0].logp
 
+    def simple_beam_search(self, xs, large_nbest=100, small_nbest=10):
+        if self.downsampler is not None:
+            xs = self.downsampler(xs)
+        xs = self.input_embed(xs)
+        xs = self.upsampler(xs)
+        xs = self.input_pos_embed(xs)
+        xs = self.encoder(xs)
+        xs = self.fc0(xs)
+        
+        N, T, F = xs.shape
+        
+        use_gpu = xs.is_cuda
+        def forward_step(label, hidden):
+            label = torch.LongTensor([label]).view(1,1)
+            if use_gpu: label = label.cuda()
+            label = self.embed(label)
+            pred, hidden = self.decoder(label, hidden)
+            return pred[0], hidden
+
+        def isprefix(a, b):
+            # a is the prefix of b
+            if a == b or len(a) >= len(b): return False
+            for i in range(len(a)):
+                if a[i] != b[i]: return False
+            return True
+
+        B = [Sequence(blank=self.blank)]
+        for i in range(T):
+            sorted(B, key=lambda a: len(a.k), reverse=True) # larger sequence first add
+            A = B
+            B = []
+
+            while True:
+                y_hat = max(A, key=lambda a: a.logp) # y* = most probable in A
+                A.remove(y_hat)
+
+                # calculate P(k|y_hat, t)
+                # get last label and hidden state
+                pred, hidden = forward_step(y_hat.k[-1], y_hat.h)
+                ytu = self.joint(torch.unsqueeze(xs[0][i],0), pred)
+                logp = F.log_softmax(ytu, dim=1) # log probability for each k
+                top_k_logp, top_k_index = torch.topk(logp, small_nbest, dim=-1)
+                top_k_logp, top_k_index = top_k_logp.tolist(), top_k_index.tolist()
+                
+                for i, k in enumerate(top_k_index):
+                    yk = Sequence(y_hat)
+                    yk.logp += float(top_k_logp[0][i])
+                    if k == self.blank:
+                        B.append(yk) # next move
+                        continue
+                    # store prediction distribution and last hidden state
+                    yk.h = hidden; yk.k.append(k);
+                    A.append(yk)
+                # sort A
+                # sort B
+                y_hat = max(A, key=lambda a: a.logp)
+                yb = max(B, key=lambda a: a.logp)
+                if len(B) >= large_nbest and yb.logp >= y_hat.logp: break
+
+            # beam width
+            sorted(B, key=lambda a: a.logp, reverse=True)
+            B = B[:large_nbest]
+
+        # return highest probability sequence
+        return B[0].k, -B[0].logp
+    
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     input_size=80

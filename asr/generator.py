@@ -52,25 +52,23 @@ def compute_global_mean_std(csv_path, config):
 
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, path, config:dict, segment=20, tokenizer=None):
+    def __init__(self, path, config:dict, segment=0, tokenizer=None, specaug=False):
         super(SpeechDataset, self).__init__()
 
         self.df = pd.read_csv(path)
         
         if config['analysis']['sort_by_len']:
             self.df = self.df.sort_values('length')
-        self.segment = segment if segment > 0 else None
+        self.segment = segment
         self.sample_rate = config['analysis']['sample_rate']
-        if self.segment is not None:
+        if self.segment > 0:
             max_len = len(self.df)
-            self.max_segment_length = int(self.segment * self.sample_rate)
-            self.df = self.df[self.df['length'] <= self.max_segment_length]
+            max_segment_length = int(self.segment * self.sample_rate)
+            self.df = self.df[self.df['length'] <= max_segment_length]
             print(
                 f"Drop {max_len - len(self.df)} utterances from {max_len} "
                 f"(shorter than {segment} seconds)"
             )
-        else:
-            self.max_segment_length = None
 
         self.wav2spec = torchaudio.transforms.Spectrogram(
             n_fft=config['analysis']['nfft'],
@@ -88,7 +86,8 @@ class SpeechDataset(torch.utils.data.Dataset):
         self.mean, self.std = npz['mean'], npz['std']
         
         self.eps = 1.e-8
-        self.specaug = True if config['augment']['specaug'] else False
+        #self.specaug = True if config['augment']['specaug'] else False
+        self.specaug = specaug
         self.wav2spec_complex=None
         if self.specaug:
             self.time_stretch = torchaudio.transforms.TimeStretch(n_freq=config['analysis']['nfft']//2+1)
