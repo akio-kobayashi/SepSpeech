@@ -192,6 +192,7 @@ class TransTransducer(nn.Module):
         if x.is_cuda: vy = vy.cuda()
         y, h = self.decoder(self.embed(vy)) # decode first zero
         y_seq = []; logp = 0
+        logp_seq = []
         for i in range(x.shape[1]):
             ytu = self.joint(torch.unsqueeze(x[0][i],0), y[0])
             out = F.log_softmax(ytu, dim=1)
@@ -199,9 +200,10 @@ class TransTransducer(nn.Module):
             pred = int(pred); logp += float(p)
             if pred != self.blank:
                 y_seq.append(pred)
+                logp_seq.append(-p.cpu().detach().numpy()[0])
                 vy.data[0][0] = pred # change pm state
                 y, h = self.decoder(self.embed(vy), h)
-        return y_seq, -logp
+        return y_seq, [-logp, logp_seq]
 
 
     def beam_search(self, xs, W=10, prefix=False):

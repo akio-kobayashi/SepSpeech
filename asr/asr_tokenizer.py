@@ -40,9 +40,24 @@ class ASRTokenizer():
             
         return self.tokenizer.encode(text)
 
-    def token2text_raw(self, token) -> str:
-        return self.tokenizer.decode(token)
+    def token2text_values(self, token, values):
+        assert len(token) == len(values)
+        rmvd, rmvd_values=[], []
+        for id, v in zip(token, values):
+            if id == self.tokenizer.eos_token_id or id == self.tokenizer.bos_token_id:
+                continue
+            rmvd.append(id)
+            rmvd_values.append(v)
+        return self.tokenizer.decode(rmvd), rmvd_values
 
+    def token2text_raw(self, token) -> str:
+        rmvd=[]
+        for id in token:
+            if id == self.tokenizer.eos_token_id or id == self.tokenizer.bos_token_id:
+                continue
+            rmvd.append(id)
+        return self.tokenizer.decode(rmvd)
+    
     def remove(self, seq):
         temp = []
         prv_id = -1

@@ -88,10 +88,11 @@ def main():
     with torch.no_grad():
         for index, row in df.iterrows():
             x = feature_extractor(row['source'])
-            decode, logp = network.greedy_decode(x.to(device))
-            text = tokenizer.token2text_raw(decode)
+            decode, [logp, logp_seq] = network.greedy_decode(x.to(device))
+            text, logp_seq = tokenizer.token2text_values(decode, logp_seq)
             texts.append(text)
-            logps.append(logp)
+            #logps.append(logp)
+            logps.append( ' '.join([ str(lp) for lp in logp_seq ]) )
     df['logp'] = logps
     df['decode'] = texts
             
