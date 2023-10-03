@@ -87,55 +87,23 @@ class LitVoiceConversion(pl.LightningModule):
         return _loss
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
-        sources, targets, = batch
+        sources, targets, source_embeds, target_embeds, source_lengths, target_lengths = batch
 
-        logits = None
-        if self.config['model_type'] == 'unet':
-            src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
-        else:
-            src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, lengths, spk_hat, speakers, valid=False)
-
-        if logits is not None:
-            valid_lengths = torch.tensor([ self.model.valid_length_ctc(l) for l in lengths ])
-            target_lengths = torch.tensor(target_lengths)
-            logprobs = F.log_softmax(logits)
-            logprobs = rearrange('b t c -> t b c')
-            with torch.cuda.amp.autocast('cuda', torch.float32):
-                _loss += self.ctc_weight * self.ctc_loss(logprobs, valid_lengths, target_lengths)
-
+        estimates = self.forward(sources, targets, source_embeds, target_embeds, source_lengths, target_lengths)
+        _loss = self.compute_loss(estimates,
+                                  sources, targets, 
+                                  source_lengths, target_lengths)
         return _loss
-
-    '''
-    def train_epoch_end(outputs:Tensor):
-        #agv_loss = torch.stack([x['loss'] for x in outputs]).mean()
-        #tensorboard_logs={'loss': agv_loss}
-        #return {'avg_loss': avg_loss, 'log': tensorboard_logs}
-    '''
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        if self.ctc_loss is None:
-            mixtures, sources, enrolls, lengths, speakers = batch
-        else:
-            mixtures, sources, enrolls, lengths, speakers, labels, target_lengths = batch
+        sources, targets, source_embeds, target_embeds, source_lengths, target_lengths = batch
 
-        logits = None
-        if self.config['model_type'] == 'unet':
-            src_hat, spk_hat, logits = self.forward(mixtures, enrolls)
-            if self.ctc_loss is not None:
-                valid_lengths = [ self.model.valid_length_ctc(l) for l in lengths ]
-        else:
-            src_hat, spk_hat, _ = self.forward(mixtures, enrolls)
-        _loss = self.compute_loss(src_hat, sources, lengths, spk_hat, speakers, valid=True)
-
+        estimates = self.forward(sources, targets, source_embeds, target_embeds, source_lengths, target_lengths)
+        _loss = self.compute_loss(estimates,
+                                  sources, targets, 
+                                  source_lengths, target_lengths,
+                                  valid=True)
         return _loss
-
-    '''
-    def on_validation_epoch_end(outputs:Tensor):
-        #agv_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        #tensorboard_logs={'val_loss': agv_loss}
-        #return {'avg_loss': avg_loss, 'log': tensorboard_logs}
-    '''
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),

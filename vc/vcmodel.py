@@ -145,7 +145,12 @@ class VoiceConversionModel(nn.Module):
         return y, loss, mloss, diag_loss
         '''
         return y
-    
+
+    def diagonal_attention_loss(self, B, T, S, src_len, tgt_len):
+        weights = voice_transformer.compute_diagonal_weights(B, T, S, src_len, tgt_len, nu)
+        diag_loss = self.transformer._diagonal_attention_loss(weights, src_len, tgt_len)
+        return diag_loss 
+           
     def generate_masks(self, src, tgt, src_len, tgt_len):
         # (B, T, F)
         B=src.shape[0]
