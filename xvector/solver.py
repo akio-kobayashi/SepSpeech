@@ -12,8 +12,8 @@ import argparse
 #from sklearn.metrics import accuracy_score
 import pytorch_lightning as pl
 
-class LitSepSpeaker(pl.LightningModule):
-    def __init__(self):
+class LitXVector(pl.LightningModule):
+    def __init__(self, config):
         super().__init__()
         
         self.model = X_vector(
@@ -36,7 +36,7 @@ class LitSepSpeaker(pl.LightningModule):
         _metric, _ = self.metric(_xvec, speakers)
         _loss = self.loss(_metric, speakers)
 
-        d['train_loss'] = _loss
+        self.log_dict({'train_loss': _loss})
 
         return _loss
     
@@ -47,7 +47,7 @@ class LitSepSpeaker(pl.LightningModule):
         _metric, _ = self.metric(_xvec, speakers)
         _loss = self.loss(_metric, speakers)
 
-        d['valid_loss'] = _loss
+        self.log_dict({'valid_loss': _loss})
 
         return _loss
 
