@@ -10,11 +10,13 @@ import torchaudio
 
 class SpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, csv_path):
+    def __init__(self, source_path, target_path, rate=0.1):
         super().__init__()
 
-        self.df = pd.read_csv(csv_path)
-        
+        self.src_df = pd.read_csv(source_path)
+        self.tgt_df = pd.read_csv(target_path)
+        self.rate = rate
+
     def __len__(self):
         return len(self.src_keys)
 
@@ -23,18 +25,24 @@ class SpeechDataset(torch.utils.data.Dataset):
         return (signal - mean)/std
     
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
+        row = self.src_df.iloc[idx]
         source,_ = torchaudio.load(row['source'])
         source = self.normalize(source)
-        target,_ = torchaudio.load(row['target'])
-        target = self.normalize(target)
-
         source_key = row['source_key']
-        target_key = row['target_key']
-        
-        source_empbed = torch.load(row['source_embed'])
-        target_empbed = torch.load(row['target_embed'])
+        source_embed = torch.load(row['source_embed'])
+        source_utterance = row['utterance']
 
+        if np.random.rand() > self.rate :
+            row = self.tgt_df.query('utterance=@source_utterance').sample()
+            target,_ = torchaudio.load(row['target'])
+            target = self.normalize(target)
+            target_key = row['target_key']   
+            target_embed = torch.load(row['target_embed'])
+        else:
+            target = source
+            target_key = source_key
+            target_embed = source_embed
+        
         return torch.t(source), torch.t(target), source_embed, target_embed, source_key, target_key
     
 def data_processing(data, data_type="train"):

@@ -90,9 +90,9 @@ class BL1Loss(nn.Module):
 
         return torch.mean(loss)
 
-class VCModel(nn.Module):
+class VoiceConversionModel(nn.Module):
     def __init__(self, config):
-        super(VCModel, self).__init__()
+        super().__init__()
         self.fdim=config['fdim']
         self.d_model=config['d_model']
         self.d_embed=config['embdim']
@@ -109,7 +109,10 @@ class VCModel(nn.Module):
                                             norm_first=True)
         self.dloss = BL1Loss()
 
-    def forward(self, src, tgt, src_spk, tgt_spk, src_len, tgt_len, nu=0.3, weight=1.):
+        self.nu = config['nu'] # 0.3
+        self.weight = config['weight'] # 1.
+
+    def forward(self, src, tgt, src_spk, tgt_spk, src_len, tgt_len):
 
         zeros=torch.zeros((src.shape[0], 1, src.shape[2]), dtype=torch.float, device=src.device)
         tgtz=torch.cat((zeros, tgt),1)
@@ -130,6 +133,7 @@ class VCModel(nn.Module):
                            memory_key_padding_mask=src_pad_mask)
         y=self.decoder(y)
         
+        '''
         loss=None
         mloss=None
         diag_loss=None
@@ -139,7 +143,9 @@ class VCModel(nn.Module):
             diag_loss = self.transformer._diagonal_attention_loss(weights, src_len, tgt_len)
             loss = mloss + weight * diag_loss
         return y, loss, mloss, diag_loss
-
+        '''
+        return y
+    
     def generate_masks(self, src, tgt, src_len, tgt_len):
         # (B, T, F)
         B=src.shape[0]
