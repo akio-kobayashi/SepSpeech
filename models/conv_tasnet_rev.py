@@ -10,7 +10,7 @@ import argparse
 import yaml
 import math
 import models.unet as unet
-
+from einops import rearrange
 '''
     ConvTasNet
     SpeakerBeam等で使われる一般的な音源分離アプローチの実装
@@ -128,7 +128,7 @@ class Conv1D(nn.Conv1d):
 
     def __init__(self, *args, **kwargs):
         super(Conv1D, self).__init__(*args, **kwargs)
-        self.in_channels, self.out_channels, self.kernel_size, self.stride, _ = args
+        #self.in_channels, self.out_channels, self.kernel_size, self.stride, _ = args
 
     def forward(self, x:Tensor, squeeze=False) -> Tensor:
         """
@@ -144,7 +144,7 @@ class Conv1D(nn.Conv1d):
         return x
 
     def valid_length(self, length:int) -> int:
-        length = int ( (length + 2 * self.padding - self.dilation * (self.kernel_size - 1) - 1)/self.stride + 1 )
+        length = int ( (length + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1)/self.stride[0] + 1 )
         return length
     
 class ConvTrans1D(nn.ConvTranspose1d):
@@ -168,8 +168,8 @@ class ConvTrans1D(nn.ConvTranspose1d):
             x = torch.squeeze(x)
         return x
     
-    def valid_length(length:int)->int:
-        length = (length - 1) * self.stride -2 * self.padding + self.dilation * (self.kernel_size - 1) + self.output_padding + 1
+    def valid_length(self, length:int)->int:
+        length = (length - 1) * self.stride[0] -2 * self.padding[0] + self.dilation[0] * (self.kernel_size[0] - 1) + self.output_padding[0] + 1
         return length
     
 class Conv1DBlock(nn.Module):
@@ -222,8 +222,8 @@ class Conv1DBlock(nn.Module):
 
     def valid_length(self, length:int) -> int:
         length = self.conv1x1.valid_length(length)
-        length = self.dconv.valid_length(length)
-        length = self.sconv.valid_length(length)
+        length = int ( (length + 2 * self.dconv.padding[0] - self.dconv.dilation[0] * (self.dconv.kernel_size[0] - 1) - 1)/self.dconv.stride[0] + 1 )
+        length = int ( (length + 2 * self.sconv.padding[0] - self.sconv.dilation[0] * (self.sconv.kernel_size[0] - 1) - 1)/self.sconv.stride[0] + 1 )
         return length
 
 class ConvTasNet(nn.Module):
@@ -255,15 +255,16 @@ class ConvTasNet(nn.Module):
         self.encoder_1d = Conv1D(config['tasnet']['feat_channels'],
                                  config['tasnet']['enc_channels'],
                                  config['tasnet']['kernel_size'],
-                                 stride=config['tasnet']['kernel_size']// 2,
-                                 padding=0)
+                                 config['tasnet']['kernel_size']// 2,
+                                 0)
         # keep T not change
         # T = int((xlen - L) / (L // 2)) + 1
         # before repeat blocks, always cLN
         self.ln = ChannelWiseLayerNorm(config['tasnet']['enc_channels'])
         # n x N x T => n x B x T
         self.proj = Conv1D(config['tasnet']['enc_channels'],
-                           config['tasnet']['in_channels'], 1)
+                           config['tasnet']['in_channels'],
+                           1)
         # repeat blocks
         # n x B x T => n x B x T
         self.first_block = self._build_repeats(
@@ -363,11 +364,12 @@ class ConvTasNet(nn.Module):
                     self.__name__, x.dim()))
         '''
         # in case of only one utterance
-        if x.dim() == 2:
-            x = torch.unsqueeze(x, 0)
-
+        #if x.dim() == 2:
+        #x = torch.unsqueeze(x, 0)
+        #x = rearrange(x, '(b c) t -> b c t', c=1)
+            
         # padding
-        _, _, input_length = x.shape
+        _, input_length = x.shape
         #if self.padding_value>0:
         #    x = self.get_padded_value(x)
         _valid_length = self.valid_length(input_length)
@@ -384,6 +386,8 @@ class ConvTasNet(nn.Module):
         #x = self.upsample(x)
 
         # n x 1 x S => n x N x T
+        print(x.shape)
+        print(self.encoder_1d(x).shape)
         w = F.relu(self.encoder_1d(x))
         # n x B x T
         y = self.proj(self.ln(w))
@@ -401,7 +405,8 @@ class ConvTasNet(nn.Module):
             m = self.non_linear(torch.stack(e, dim=0))
         # spks x [n x N x T]
         s = w * m
-        out = self.decoder_1d(y, squeeze=True)
+        out = self.decoder_1d(s, squeeze=True)
+        #out = self.decoder_1d(y, squeeze=True)
         #if out.dim() == 1: # in case of batch size = 1
         #    out = torch.unsqueeze(out, 0)
         # downsample
@@ -417,7 +422,7 @@ class ConvTasNet(nn.Module):
         return out, z, None # dummy
 
     def valid_length(self, length:int) -> int:
-        length = self.encoder_1d().valid_length(length)
+        length = self.encoder_1d.valid_length(length)
         length = self.proj.valid_length(length)
         for rpt in self.first_block:
             for blk in rpt:
@@ -427,7 +432,7 @@ class ConvTasNet(nn.Module):
             for blk in rpt:
                 if type(blk) == Conv1DBlock:
                     length = blk.valid_length(length)
-        length = self.decoder_1d().valid_length(length)
+        length = self.decoder_1d.valid_length(length)
         return length
     
     '''

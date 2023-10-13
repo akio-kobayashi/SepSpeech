@@ -1,7 +1,7 @@
-model_type: e3net # tasnet/fast_unet/unet/unet2/e3net
+model_type: tasnet # tasnet/fast_unet/unet/unet2/e3net
 dataset:
   process:
-    batch_size: 32
+    batch_size: 16
     num_workers: 2
   segment:
     segment: 10
@@ -9,11 +9,11 @@ dataset:
     sample_rate: 16000
     random_select: 0.1
   train:
-    csv_path: '~/SepSpeech/audio/csv/train_3p_phone.csv'
-    enroll_csv_path: '~/SepSpeech/audio/csv/enroll_3p.csv'
+    csv_path: '~/SepSpeech/audio/csv/mix_train.csv'
+    enroll_csv_path: '~/SepSpeech/audio/csv/jnas_enroll.csv'
   valid:
-    csv_path: '~/SepSpeech/audio/csv/valid_3p_phone.csv'
-    enroll_csv_path: '~/SepSpeech/audio/csv/enroll_3p.csv'
+    csv_path: '~/SepSpeech/audio/csv/mix_valid.csv'
+    enroll_csv_path: '~/SepSpeech/audio/csv/jnas_enroll.csv'
   test:
     csv_path: 
     enroll_csv_path: 
@@ -27,8 +27,8 @@ trainer:
 optimizer:
   lr: 1.e-4
 logger:
-  save_dir: './e3net'
-  version: 1
+  save_dir: './tasnet'
+  version: 5
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
@@ -46,7 +46,7 @@ loss:
     alpha: 0.5
     beta: 1.0
     gamma: 0.1
-    weight: 1.0
+    weight: 0.
   ce_loss:
     weight: 0.1
   l1_loss:
@@ -72,6 +72,7 @@ speaker:
 # models
 tasnet:
   kernel_size: 20
+  feat_channels: 1
   in_channels: 256
   enc_channels: 256
   conv_channels: 256
