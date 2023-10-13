@@ -13,61 +13,23 @@ warnings.filterwarnings('ignore')
 
 def main(config:dict, checkpoint_path=None):
 
-    model = LitXVector(config)
+    train_dataset = SpeechDataset(csv_path=config['dataset']['train']['csv_path'],
+                                  speaker_path=config['dataset']['speaker_path'])
+    train_loader = data.DataLoader(dataset=train_dataset,
+                                   **config['dataset']['process'],
+                                   pin_memory=True,
+                                   shuffle=True, 
+                                   collate_fn=lambda x: xvector.speech_dataset.data_processing(x))
+    valid_dataset = SpeechDataset(csv_path=config['dataset']['valid']['csv_path'],
+                                  speaker_path=config['dataset']['speaker_path'])
+    valid_loader = data.DataLoader(dataset=valid_dataset,
+                                   **config['dataset']['process'],
+                                   pin_memory=True,
+                                   shuffle=False, 
+                                   collate_fn=lambda x: xvector.speech_dataset.data_processing(x))
+    config['xvector']['class_num'] = train_dataset.num_speakers()
     
-    if config['ctc']['use']:
-        tokenizer = ASRTokenizer(config['dataset']['tokenizer'])
-        
-    if config['ctc']['use'] is False:
-        train_dataset = SpeechDataset(csv_path=config['dataset']['train']['csv_path'],
-                                      enroll_path=config['dataset']['train']['enroll_csv_path'],
-                                      sample_rate=config['dataset']['segment']['sample_rate'],
-                                      segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                      random_select=config['dataset']['segment']['random_select'])
-        train_loader = data.DataLoader(dataset=train_dataset,
-                                       **config['dataset']['process'],
-                                       pin_memory=True,
-                                       shuffle=True, 
-                                       collate_fn=lambda x: conventional.speech_dataset.data_processing(x))
-    else:
-        train_dataset = SpeechDatasetCTC(csv_path=config['dataset']['train']['csv_path'],
-                                         enroll_path=config['dataset']['train']['enroll_csv_path'],
-                                         sample_rate=config['dataset']['segment']['sample_rate'],
-                                         segment=config['dataset']['segment']['segment'],
-                                         enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                         random_select=config['dataset']['segment']['random_select'],
-                                         tokenizer=tokenizer)
-        train_loader = data.DataLoader(dataset=train_dataset,
-                                       **config['dataset']['process'],
-                                       pin_memory=True,
-                                       shuffle=True, 
-                                       collate_fn=lambda x: conventional.speech_dataset.data_processing_ctc(x))
-    if config['ctc']['use'] is False:
-        valid_dataset = SpeechDataset(csv_path=config['dataset']['valid']['csv_path'],
-                                      enroll_path=config['dataset']['valid']['enroll_csv_path'],
-                                      sample_rate=config['dataset']['segment']['sample_rate'],
-                                      segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                      random_select=config['dataset']['segment']['random_select'])
-        valid_loader = data.DataLoader(dataset=valid_dataset,
-                                       **config['dataset']['process'],
-                                       pin_memory=True,
-                                       shuffle=False, 
-                                       collate_fn=lambda x: conventional.speech_dataset.data_processing(x))
-    else:
-        valid_dataset = SpeechDataset(csv_path=config['dataset']['valid']['csv_path'],
-                                      enroll_path=config['dataset']['valid']['enroll_csv_path'],
-                                      sample_rate=config['dataset']['segment']['sample_rate'],
-                                      segment=config['dataset']['segment']['segment'],
-                                      enroll_segment=config['dataset']['segment']['enroll_segment'],
-                                      random_select=config['dataset']['segment']['random_select'],
-                                      tokenizer=tokenizer)
-        valid_loader = data.DataLoader(dataset=valid_dataset,
-                                       **config['dataset']['process'],
-                                       pin_memory=True,
-                                       shuffle=False, 
-                                       collate_fn=lambda x: conventional.speech_dataset.data_processing_ctc(x))
+    model = LitXVector(config['xvector'])
         
     callbacks = [
         pl.callbacks.ModelCheckpoint( **config['checkpoint'])

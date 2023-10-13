@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.utils.data as data
 import torch.optim as optim
 import torch.nn.functional as F
-from xvector.adacs import AdaCos 
+from xvector.adacos import AdaCos 
 from xvector.model import X_vector
-from xvector.generator import SpeakerDataset
+from xvector.speech_dataset import SpeechDataset
 import numpy as np
 import argparse
 #from sklearn.metrics import accuracy_score
@@ -25,6 +25,7 @@ class LitXVector(pl.LightningModule):
         )
         self.metric = AdaCos(config['output_dim'], config['class_num'])
         self.loss = nn.CrossEntropyLoss()
+        self.config = config
         
     def forward(self, inputs, speakers, lengths):
         return self.model(inputs, speakers, lengths)
@@ -56,4 +57,3 @@ class LitXVector(pl.LightningModule):
                                      **self.config['optimizer'])
         return optimizer
     
-

@@ -3,9 +3,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-#import h5py
-from tdnn import TDNN
-from adacos import AdaCos
+from xvector.tdnn import TDNN
+from xvector.adacos import AdaCos
+from models.e3net import LearnableEncoder
+from einops import rearrange
 
 def get_mask(tensor, lengths):
     mask = np.zeros((tensor.shape[0], tensor.shape[1], 1))
@@ -35,6 +36,7 @@ class X_vector(nn.Module):
     def __init__(self, input_dim = 40, dim=512, dim1=1500, dim2=3000, output_dim=256):
         super(X_vector, self).__init__()
 
+        self.encoder = LearnableEncoder(chout=input_dim)
         self.tdnn1 = TDNN(input_dim=input_dim, output_dim=dim, context_size=5, dilation=1,dropout_p=0.5)
         self.tdnn2 = TDNN(input_dim=dim, output_dim=dim, context_size=3, dilation=2,dropout_p=0.5)
         self.tdnn3 = TDNN(input_dim=dim, output_dim=dim, context_size=3, dilation=3,dropout_p=0.5)
@@ -46,7 +48,12 @@ class X_vector(nn.Module):
         #self.criterion = AdaCos(output_dim, class_num)
 
     def forward(self, inputs, speakers=None, lengths=None):
-        tdnn1_out = self.tdnn1(inputs)
+        # (B, T) -> (B, 1, T)
+        inputs = rearrange(inputs, '(b c) t -> b c t', c=1)
+        encode = self.encoder(inputs)
+        # (B, C, T) -> (B, T, C)
+        encode = rearrange(encode, 'b c t -> b t c')
+        tdnn1_out = self.tdnn1(encode)
         tdnn2_out = self.tdnn2(tdnn1_out)
         tdnn3_out = self.tdnn3(tdnn2_out)
         tdnn4_out = self.tdnn4(tdnn3_out)
