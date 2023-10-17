@@ -91,14 +91,20 @@ def main(config:dict, checkpoint_path=None):
                           logger=logger,
                           devices=args.gpus,
                           **config['trainer'] )
-
-    trainer.fit(model=model, ckpt_path=args.checkpoint, train_dataloaders=train_loader,
-                val_dataloaders=valid_loader)
+    if args.pretrained:
+        state_dict = torch.load(torch.load(args.checkpoint))
+        model.model.load_state_dict(state_dict["state_dict"], strict=False)
+        trainer.fit(model=model, train_dataloaders=train_loader,
+                    val_dataloaders=valid_loader)
+    else:
+        trainer.fit(model=model, ckpt_path=args.checkpoint, train_dataloaders=train_loader,
+                    val_dataloaders=valid_loader)
         
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, default=None)
+    parser.add_argument('--pretrained', type=str, default=None)
     parser.add_argument('--gpus', nargs='*', type=int)
     args=parser.parse_args()
 
@@ -106,4 +112,7 @@ if __name__ == '__main__':
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
 
+    if 'config' in config.keys():
+        config = config['config']
+        
     main(config, args.checkpoint)

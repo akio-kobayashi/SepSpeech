@@ -53,31 +53,33 @@ class LitSepSpeaker(pl.LightningModule):
         self.ce_loss_weight = config['loss']['ce_loss']['weight']
 
         # Mean Absolute Error (temporal domain)
-        if 'l1_loss' in config['loss'].keys():
+        if 'l1_loss' in config['loss'].keys() and config['loss']['l1_loss']['weight'] > 0.0:
             self.l1_loss = L1Loss()
             self.l1_loss_weight = config['loss']['l1_loss']['weight']
         else:
             self.l1_loss_weight = 0.
             
         # MFCC Loss
-        if 'mfcc' in config['loss'].keys():
+        if 'mfcc' in config['loss'].keys() and config['loss']['mfcc']['weight'] > 0.0:
             self.mfcc_loss = MFCCLoss(config['loss']['mfcc'])
             self.mfcc_loss_weight = config['loss']['mfcc']['weight']
         else:
             self.mfcc_loss_weight = 0.
             
         # LFCC Loss
-        if 'lfcc' in config['loss'].keys():
+        if 'lfcc' in config['loss'].keys() and config['loss']['lfcc']['weight'] > 0.0:
             self.lfcc_loss = LFCCLoss(config['loss']['lfcc'])
             self.lfcc_loss_weight = config['loss']['lfcc']['weight']
         else:
             self.lfcc_loss_weight = 0.
 
         # PLCPA Loss
-        if 'plcpa_asym' in config['loss'].keys():
+        if 'plcpa_asym' in config['loss'].keys() and config['loss']['plcpa']['weight'] > 0.0:
             self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
             self.plcpa_weight = config['loss']['plcpa_asym']['weight']
-
+        else:
+            self.plcpa_weight = 0.
+            
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
         if config['loss']['stft_loss']['use']:
