@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
 import torchaudio.transforms as T
-from loss.stft_loss import stft
+#from loss.stft_loss import stft
 from einops import rearrange
 
 '''
@@ -158,3 +158,28 @@ class LFCCLoss(nn.Module):
             mask[b, :, :lengths[b]] = 1.
         return self.loss(preds * mask, targets * mask) / torch.sum(mask)
     
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    import yaml
+    parser = ArgumentParser()
+    parser.add_argument('--source', type=str, required=True)
+    parser.add_argument('--target', type=str, required=True)
+    parser.add_argument('--config', type=str, required=True)
+    args=parser.parse_args()
+
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+    config['config']['loss']['mfcc']['hop_length']=200
+    config['config']['loss']['mfcc']['n_mels']=20
+    loss=MFCCLoss(config['config']['loss']['mfcc'])
+    
+    source,_=torchaudio.load(args.source)
+    std, mean = torch.std_mean(source)
+    source = (source-mean)/std
+    target,_=torchaudio.load(args.target)
+    std, mean = torch.std_mean(target)
+    target = (target-mean)/std
+    lengths = [source.shape[-1]]
+    _loss = loss(source, target, lengths)
+    
+    print(_loss)
