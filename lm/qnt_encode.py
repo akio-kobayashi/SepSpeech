@@ -17,26 +17,18 @@ class EncodecQuantizer:
         super().__init__()
         #@cache
         self.device = 'cuda'
-        #def _load_model(device="cuda"):
         # Instantiate a pretrained EnCodec model
         self.model = EncodecModel.encodec_model_24khz()
         self.model.set_target_bandwidth(6.0)
-        self.model.to(device)
-        #return model
-
-
-        #def unload_model():
-        #return _load_model.cache_clear()
-
+        self.model.to(self.device)
 
     @torch.inference_mode()
-    def decode(self, codes: Tensor, device="cuda"):
+    def decode(self, codes: Tensor):
         """
         Args:
         codes: (b q t)
         """
         assert codes.dim() == 3
-        #model = _load_model(device)
         return self.model.decode([(codes, None)]), self.model.sample_rate
 
 
@@ -50,17 +42,15 @@ class EncodecQuantizer:
     def _replace_file_extension(self, path, suffix):
         return (path.parent / path.name.split(".")[0]).with_suffix(suffix)
 
-
     @torch.inference_mode()
-    def encode(wav: Tensor, sr: int, device="cuda"):
+    def encode(self, wav: Tensor, sr: int, device="cuda"):
         """
         Args:
         wav: (t)
         sr: int
         """
-        #model = _load_model(device)
         wav = wav.unsqueeze(0)
-        wav = convert_audio(wav, sr, model.sample_rate, model.channels)
+        wav = convert_audio(wav, sr, self.model.sample_rate, self.model.channels)
         wav = wav.to(device)
         encoded_frames = self.model.encode(wav)
         qnt = torch.cat([encoded[0] for encoded in encoded_frames], dim=-1)  # (b q t)
@@ -70,7 +60,7 @@ class EncodecQuantizer:
         wav, sr = torchaudio.load(str(path))
         if wav.shape[0] == 2:
             wav = wav[:1]
-        return self.encode(wav, sr, device)
+        return self.encode(wav, sr, self.device)
 
 '''
     Test module
