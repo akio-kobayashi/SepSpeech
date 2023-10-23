@@ -19,7 +19,7 @@ def main(config:dict, checkpoint_path=None):
     train_dataset = QntSpeechDataset(source_path=config['dataset']['train']['source_path'], 
                                      target_path=config['dataset']['train']['target_path'], 
                                      speaker_path=config['dataset']['speaker_path'], 
-                                     rate=config['dataset']['rate']
+                                     rate=config['dataset']['random_select']
     )
     
     train_loader = data.DataLoader(dataset=train_dataset,
