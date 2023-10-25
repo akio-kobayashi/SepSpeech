@@ -20,7 +20,7 @@ def get_divisor(model):
     with torch.no_grad():
         for n in range(1000, 1100):
             x = torch.rand(4, n)
-            o = model(x)
+            o = model(x.cuda())
             if x.shape[-1] == o.shape[-1] :
                 if start < 0:
                     start = n
@@ -52,17 +52,18 @@ class RadioDataset(torch.utils.data.Dataset):
         self.segment = segment if segment > 0 else None
         self.sample_rate = sample_rate
         if self.segment is not None:
+            min_sec = 3
             max_len = len(self.df)
-            self.seg_len = int(self.segment * self.sample_rate)
-            self.df = self.df[self.df['length'] <= self.seg_len]
+            seg_len = int(self.segment * self.sample_rate)
+            self.df = self.df[self.df['length'] / 2 <= seg_len]
+            self.df = self.df[self.df['length'] / 2 >= min_sec*16000 ]
             print(
                 f"Drop {max_len - len(self.df)} utterances from {max_len} "
-                f"(shorter than {segment} seconds)"
+                f"(shorter than {segment} seconds and (larget than {min_sec} seconds))"
             )
-        else:
-            self.seg_len = None
 
         # augmentation
+        '''
         self.lowpass = LowPassRadio(config).cuda()
         if config['augment']['white_noise']['use']:
             self.white_noise = WhiteNoiseAugment(config).cuda()
@@ -77,24 +78,25 @@ class RadioDataset(torch.utils.data.Dataset):
             self.fading_augment = FadingAugment(config).cuda()
         else:
             self.fading_augment = None
-            
+        '''
         self.divisor = divisor
-        
+
     def __len__(self) -> int:
         return len(self.df)
 
     def __getitem__(self, idx:int) -> Tuple[Tensor, Tensor]:
         row = self.df.iloc[idx]
 
-        source_path = row['source']
+        #source_path = row['source']
         with torch.no_grad():
-            source, sr = torchaudio.load(source_path)
+            source, sr = torchaudio.load(row['clean'])
             std, mean = torch.std_mean(source, dim=-1)
             source = (source - mean)/std
 
             if self.divisor > 0 and source.shape[-1] % self.divisor > 0:
                 source = sd.padding(source, self.divisor)
 
+            '''
             if self.white_noise is not None:
                 noise = self.white_noise(source)
             else:
@@ -108,6 +110,8 @@ class RadioDataset(torch.utils.data.Dataset):
                 mixture = source + noise
 
             mixture = self.lowpass(mixture)
+            '''
+            mixture, _ = torchaudio.load(row['noisy'])
             std, mean = torch.std_mean(mixture, dim=-1)
             mixture = (mixture - mean)/std
             #mixture = self.random_amp(self.lowpass(source)) + noise

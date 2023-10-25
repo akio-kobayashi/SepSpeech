@@ -146,6 +146,7 @@ class DecoderBlock(nn.Module):
     def forward(self, x:Tensor) -> Tensor:
         return self.block(x)
 
+#@torch.compile
 class UNetRadio(nn.Module):
     def __init__(self, config:dict) -> None:
         super().__init__()
@@ -197,10 +198,12 @@ class UNetRadio(nn.Module):
     def valid_length(self, length):
         length = math.ceil(length * self.resample)
         for idx in range(self.depth):
-            length = math.ceil((length - self.kernel_size)/self.stride) + 1
+            #length = math.ceil((length - self.kernel_size)/self.stride) + 1
+            length = int ( (length - (self.kernel_size - 1) -1)/self.stride + 1 )
             length = max(length, 1)
         for idx in range(self.depth):
-            length = (length - 1) * self.stride + self.kernel_size
+            #length = (length - 1) * self.stride + self.kernel_size
+            length = (length - 1) * self.stride + (self.kernel_size - 1) + 1
         length = int(math.ceil(length/self.resample))
         return int(length)
     
@@ -210,7 +213,7 @@ class UNetRadio(nn.Module):
 
     def forward(self, mix:Tensor) -> Tensor:
         if mix.dim() == 2:
-            mix = mix.unsqueeze(1) 
+            mix = rearrange(mix, 'b (c t) -> b c t', c=1) 
         
         if self.normalize:
             mono = mix.mean(dim=1, keepdim=True)
@@ -218,9 +221,18 @@ class UNetRadio(nn.Module):
             mix = mix/(self.floor + std)
         else:
             std = 1
-        length = mix.shape[-1]
         x = mix
-        x = F.pad(x, (0, self.valid_length(length) - length))
+        length = x.shape[-1]
+        _valid_length = self.valid_length(length)
+        if _valid_length < length:
+            adj_length = length+1
+            while(1):
+                _valid_length = self.valid_length(adj_length)
+                if _valid_length >= adj_length:
+                    break
+                adj_length += 1
+            x = F.pad(x, (0, adj_length - length))
+        
         if self.resample == 2:
             x = upsample2(x)
         elif self.resample == 4:
@@ -247,7 +259,8 @@ class UNetRadio(nn.Module):
         elif self.resample == 4:
             x = downsample2(x)
             x = downsample2(x)
-        x = rearrange(x, 'b c t -> b (c t)')
+        if x.shape[1] == 1:
+            x = rearrange(x, 'b c t -> b (c t)')
         x = x[..., :length]
         return std * x
         

@@ -146,6 +146,7 @@ class DecoderBlock(nn.Module):
     def forward(self, x:Tensor) -> Tensor:
         return self.block(x)
 
+#@torch.compile
 class UNet(nn.Module):
     def __init__(self, config:dict) -> None:
         super().__init__()
@@ -252,7 +253,15 @@ class UNet(nn.Module):
             std = 1
         length = mix.shape[-1]
         x = mix
-        x = F.pad(x, (0, self.valid_length(length) - length))
+        _valid_length = self.valid_length(length)
+        if _valid_length < length:
+            adj_length = length+1
+            while(1):
+                _valid_length = self.valid_length(adj_length)
+                if _valid_length >= adj_length:
+                    break
+            x = F.pad(x, (0, adj_length - length))
+            
         if self.resample == 2:
             x = upsample2(x)
         elif self.resample == 4:

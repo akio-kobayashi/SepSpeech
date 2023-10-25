@@ -11,11 +11,13 @@ import torchaudio.transforms as T
 import pandas
 import numpy as np
 
+'''
 def compute_rms(source:Tensor):
     return torch.sqrt(torch.mean(torch.square(source)))
 
 def compute_adjusted_rms(rms:Tensor, snr:float):
     return rms/(10 ** snr / 20)
+'''
 
 def white_noise(length:int):
     return torch.normal(mean=0., std=1., size=(1, length))
@@ -23,16 +25,17 @@ def white_noise(length:int):
 def narrow_band_noise(length:int, sample_rate:int=16000, central_freq:int=4000, Q=100.0):
     return F.bandpass_biquad(white_noise(length), sample_rate, central_freq, Q, const_skirt_gain=False)
 
+'''
 def get_scale(source:Tensor, noise:Tensor, snr_db=20):
     snr = math.exp(snr_db/10)
     scale = snr * (noise.norm(p=2)/source.norm(p=2))
     return (scale * source + noise) / 2
-
+'''
 
 class AugmentBase(nn.Module):
     def __init__(self, config:dict):
         super().__init__()
-        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")        
         self.sample_rate = config['dataset']['segment']['sample_rate']
         self.min_snr = 0
         self.max_snr = 0
@@ -40,9 +43,9 @@ class AugmentBase(nn.Module):
 
     def get_snr(self):
         if self.fix_snr:
-            return self.max_snr
+            return torch.tensor([self.max_snr], device=self.device)
         else:
-            return np.random.rand() * (self.max_snr - self.min_snr) + self.min_snr
+            return torch.tensor([np.random.rand() * (self.max_snr - self.min_snr) + self.min_snr], device=self.device)
         
     def forward(self, x:Tensor):
         pass
@@ -59,9 +62,10 @@ class WhiteNoiseAugment(AugmentBase):
         with torch.no_grad():
             snr = self.get_snr()
             noise = white_noise(x.shape[-1]).cuda()
-            factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise)).cuda()
+            return F.add_noise(x, noise, snr)
+            #factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise)).cuda()
 
-        return factor * noise
+        #return factor * noise
 
 class NarrowBandNoiseAugment(AugmentBase):
     def __init__(self, config:dict):
@@ -92,9 +96,10 @@ class NarrowBandNoiseAugment(AugmentBase):
                 Q = np.random.rand() * (self.max_Q - self.min_Q) + self.min_Q
             
                 noise = F.bandpass_biquad(noise, self.sample_rate, central_freq, Q, const_skirt_gain=False).cuda()
-                factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise)).cuda()
+                return F.add_noise(x, noise, snr)
+                #factor = torch.div(compute_adjusted_rms(compute_rms(torch.abs(x)), snr), compute_rms(noise)).cuda()
 
-        return factor * noise
+        #return factor * noise
 
 class RandomAmplitudeModulationAugment(AugmentBase):
     def __init__(self, config:dict):

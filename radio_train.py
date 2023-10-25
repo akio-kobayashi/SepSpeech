@@ -1,6 +1,6 @@
 import torch
 import pytorch_lightning as pl
-from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import TensorBoardLogger, MLFlowLogger
 import torch.utils.data as data
 from lite.radio_solver import LitDenoiser
 import torch.utils.data as dat
@@ -10,23 +10,26 @@ from argparse import ArgumentParser
 import yaml
 import warnings
 warnings.filterwarnings('ignore')
+#import faulthandler
+#faulthandler.enable()
 
 '''
  PyTorch Lightning用 将来変更する予定
 '''
 def main(config:dict, checkpoint_path=None, dict_path=None):
 
-    if checkpoint_path is not None:
-        model = LitDenoiser.load_from_checkpoint(checkpoint_path, config=config)
-    elif dict_path is not None:
-        model.model.to('cpu')
-        model.model.load_dict(torch.load(dict_path), map_location=torch.device('cpu'))
-        model.model.to('gpu')
-    else:
-        model = LitDenoiser(config)
-
-    divisor = rd.get_divisor(model)
-    
+    #if checkpoint_path is not None:
+    #model = LitDenoiser.load_from_checkpoint(checkpoint_path, config=config)
+    #elif dict_path is not None:
+    #model.model.to('cpu')
+    #model.model.load_dict(torch.load(dict_path), map_location=torch.device('cpu'))
+    #    model.model.to('gpu')
+    #else:
+    model = LitDenoiser(config)
+    model.model.to('cuda')
+    #divisor = rd.get_divisor(model)
+    divisor=0
+   
     train_dataset = RadioDataset(config['dataset']['train']['csv_path'],
                                  config,
                                  segment=config['dataset']['segment']['segment'],
@@ -51,19 +54,24 @@ def main(config:dict, checkpoint_path=None, dict_path=None):
         pl.callbacks.ModelCheckpoint( **config['checkpoint'])
     ]
     logger = TensorBoardLogger(**config['logger'])
+    #logger = MLFlowLogger(**config['logger'])
     trainer = pl.Trainer( callbacks=callbacks,
                           logger=logger,
                           devices=args.gpus,
                           **config['trainer'] )
-    trainer.fit(model=model, train_dataloaders=train_loader,
+    trainer.fit(model=model, ckpt_path=args.checkpoint, train_dataloaders=train_loader,
                 val_dataloaders=valid_loader)
 
 if __name__ == '__main__':
+    torch.autograd.set_detect_anomaly(False)
+    torch.autograd.profiler.emit_nvtx(False)
+    torch.autograd.profiler.profile(False)
+    
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--dict_path', type=str, default=None)
-    parser.add_argument('--gpus', nargs='*', type=int)
+    parser.add_argument('--gpus', nargs='*', type=int, default=0)
     args=parser.parse_args()
 
     torch.set_float32_matmul_precision('high')

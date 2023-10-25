@@ -54,7 +54,8 @@ def main(args):
     assert args.checkpoint is not None
     model = LitDenoiser.load_from_checkpoint(args.checkpoint,
                                              config=config).to(device)
-    divisor = get_divisor(model)
+    #divisor = get_divisor(model)
+    divisor=0
     model.eval()
     
     sample_rate = config['dataset']['segment']['sample_rate']
