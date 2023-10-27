@@ -68,7 +68,8 @@ class CepstrumLoss(nn.Module):
         
         mask = torch.zeros_like(preds, dtype=preds.dtype, device=preds.device)
         for b in range(len(preds)):
-            mask[b, :, :lengths[b]] = 1.
+            length = 1 + (lengths[b]-self.n_fft)//self.hop_length
+            mask[b, :, :length] = 1.
         return self.loss(preds * mask, targets * mask) / torch.sum(mask)
 
 class MultiResolutionCepstrumLoss(nn.Module):
