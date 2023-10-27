@@ -1,0 +1,50 @@
+dataset:
+  process:
+    batch_size: 8
+    num_workers: 1
+  random_select: 0.1
+  train:
+    source_path: 'audio/csv/*.csv'
+    target_path: 'audio/csv/*.csv'
+    speaker_path: 'audio/csv/*.json'
+  valid:  
+    soruce_path: 'audio/csv/*csv'
+    target_path: 'audio/csv/*csv'
+    speaker_path: 'audio/csv/*json'
+  test:
+    csv_path: 
+    enroll_path: 
+    noise_path:
+trainer:
+  accelerator: 'auto'
+  accumulate_grad_batches: 5
+  max_epochs: 400
+  precision: '16-mixed'
+  profiler: 'simple'
+  gradient_clip_val: 5.
+optimizer:
+  lr: 1.e-4
+logger:
+  save_dir: './log_qnt_vc'
+  version: 1
+  name: 'lightning_logs'
+checkpoint:
+  monitor: 'valid_loss'
+  filename: 'checkpoint_{epoch}-{step}-{valid_loss:.3f}'
+  save_last: True
+  save_top_k: 1
+  mode: 'min'
+  every_n_epochs: 1
+# models
+transformer:
+  num_speakers:
+  num_speaker_embeddings:
+  num_qnt_symbols:
+  num_symbol_embeddings:
+  num_channels:
+  max_length: 2048
+  num_heads: 16
+  num_encoder_layers: 6
+  num_decoder_layers: 6
+  dim_feedforward: 2048
+  dropout: 0.1
