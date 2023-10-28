@@ -26,7 +26,7 @@ def main(args):
             else:
                 df_tgt_valid = pd.concat([df_tgt_valid, df_sample])
 
-    df_src.to_csv(args.output_soruce_train, index=False)
+    df_src.to_csv(args.output_source_train, index=False)
     df_src_valid.to_csv(args.output_source_valid, index=False)
     df_tgt.to_csv(args.output_target_train, index=False)
     df_tgt_valid.to_csv(args.output_target_valid, index=False)
