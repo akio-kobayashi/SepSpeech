@@ -13,6 +13,7 @@ def main(args):
     df_tgt = pd.read_csv(args.target_csv, index_col=0)
 
     df_removed = pd.DataFrame(df_src[df_src['utt'].str.startswith('\d')])
+    print(len(df_removed))
     df_src.drop(df_removed.index, inplace=True)
     df_tgt_valid=None
     for n in range(args.num_valid):
@@ -20,7 +21,7 @@ def main(args):
         df_src.drop(df_src_valid.index, inplace=True)
         for index, row in df_src_valid.iterrows():
             utt=row['utt']
-            print(utt)
+            #print(utt)
             df_filt = df_tgt.query('utt==@utt')
             print(len(df_filt))
             df_sample = df_filt.sample(1)
