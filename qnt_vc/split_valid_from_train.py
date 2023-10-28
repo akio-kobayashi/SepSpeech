@@ -11,22 +11,25 @@ def main(args):
 
     df_src = pd.read_csv(args.source_csv, index_col=0)
     df_tgt = pd.read_csv(args.target_csv, index_col=0)
-    df_src = pd.DataFrame(df_src[df_src['utt'].str.startswith('[A-J]')])
+    df_src = pd.DataFrame(df_src[df_src['utt'].str.contains('[A-J]')])
+    #print(len(df_src))
     df_tgt_valid=None
-    for n in range(args.num_valid):
-        df_src_valid = df_src.sample(args.num_valid)
-        df_src.drop(df_src_valid.index, inplace=True)
-        for index, row in df_src_valid.iterrows():
-            utt=row['utt']
-            #print(utt)
-            df_filt = df_tgt.query('utt==@utt')
-            print(len(df_filt))
-            df_sample = df_filt.sample(1)
-            df_tgt.drop(df_sample.index, inplace=True)
-            if df_tgt_valid is None:
-                df_tgt_valid = df_sample
-            else:
-                df_tgt_valid = pd.concat([df_tgt_valid, df_sample])
+
+    df_src_valid = df_src.sample(args.num_valid)
+    df_src.drop(df_src_valid.index, inplace=True)
+    for index, row in df_src_valid.iterrows():
+        utt=row['utt']
+        #print(utt)
+        df_filt = df_tgt.query('utt==@utt')
+        if len(df_filt) == 0:
+            print(f'{n} {utt} {len(df_filt)} {len(df_tgt)}')
+        df_sample = df_filt.sample(1)
+        #print(len(df_sample))
+        df_tgt.drop(df_sample.index, inplace=True)
+        if df_tgt_valid is None:
+            df_tgt_valid = df_sample
+        else:
+            df_tgt_valid = pd.concat([df_tgt_valid, df_sample])
 
     df_src.to_csv(args.output_source_train, index=False)
     df_src_valid.to_csv(args.output_source_valid, index=False)
