@@ -13,7 +13,7 @@ class LitVoiceConversion(pl.LightningModule):
         super().__init__()
         self.config = config
         #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = QntVoiceConversionModel(config)
+        self.model = QntVoiceConversionModel(config['transformer'])
 
         # Mean Absolute Error (temporal domain)
         self.ce_loss = nn.CrossEntropyLoss(ignore_index=-1)
