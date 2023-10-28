@@ -37,11 +37,11 @@ checkpoint:
   every_n_epochs: 1
 # models
 transformer:
-  num_speakers:
-  num_speaker_embeddings:
-  num_qnt_symbols:
-  num_symbol_embeddings:
-  num_channels:
+  num_speakers: 338
+  num_speaker_embeddings: 256
+  num_qnt_symbols: 1026
+  num_symbol_embeddings: 256
+  num_channels: 8
   max_length: 2048
   num_heads: 16
   num_encoder_layers: 6
