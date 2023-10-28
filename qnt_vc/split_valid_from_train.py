@@ -11,11 +11,7 @@ def main(args):
 
     df_src = pd.read_csv(args.source_csv, index_col=0)
     df_tgt = pd.read_csv(args.target_csv, index_col=0)
-    sr=df_src[df_src['utt'].str.startswith('\d')]
-    print(len(sr))
-    df_removed = pd.DataFrame(df_src[df_src['utt'].str.startswith('\d')])
-    print(len(df_removed))
-    df_src.drop(df_removed.index, inplace=True)
+    df_src = pd.DataFrame(df_src[df_src['utt'].str.startswith('[A-J]')])
     df_tgt_valid=None
     for n in range(args.num_valid):
         df_src_valid = df_src.sample(args.num_valid)
