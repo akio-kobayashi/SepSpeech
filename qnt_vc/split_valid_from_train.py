@@ -18,6 +18,7 @@ def main(args):
         df_src.drop(df_src_valid.index, inplace=True)
         for index, row in df_src_valid.iterrows():
             utt=row['utt']
+            print(utt)
             df_filt = df_tgt.query('utt==@utt')
             print(len(df_filt))
             df_sample = df_filt.sample(1)
