@@ -12,7 +12,7 @@ class LitVoiceConversion(pl.LightningModule):
     def __init__(self, config:dict) -> None:
         super().__init__()
         self.config = config
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = QntVoiceConversionModel(config)
 
         # Mean Absolute Error (temporal domain)
@@ -28,7 +28,7 @@ class LitVoiceConversion(pl.LightningModule):
         for b in range(len(targets)):
             _tgt = rearrange(targets[b][0,:,:], '(c t) f -> c t f', c=1)
             _targets.append(rearrange(U.append_special_tokens(_tgt, bos=False), 'c t f -> t c f'))
-        _targets = nn.utils.rnn.pad_sequence(_targets, batch_first=True, padding_value=-1).to(self.device)
+        _targets = nn.utils.rnn.pad_sequence(_targets, batch_first=True, padding_value=-1).to('cuda')
         _targets = rearrange(_targets, 'b t c f -> b c t f')            
         _loss = self.ce_loss(ar_outputs, _targets)
         if valid is True:
@@ -42,7 +42,7 @@ class LitVoiceConversion(pl.LightningModule):
         for b in range(len(targets)):
             _tgt = targets[b][1:,:,:]
             _targets.append(rearrange(_tgt, 'c t f -> t c f'))
-        _targets = nn.utils.rnn.pad_sequence(_targets, batch_first=True, padding_value=-1).to(self.device)
+        _targets = nn.utils.rnn.pad_sequence(_targets, batch_first=True, padding_value=-1).to('cuda')
         _targets = rearrange(_targets, 'b t c f -> b c t f')            
         _loss = self.ce_loss(nar_outputs, _targets)
         if valid is True:
