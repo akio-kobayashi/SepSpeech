@@ -28,8 +28,8 @@ class QntVoiceConversionModel(nn.Module):
         super().__init__()        
         self.speaker_embedding = nn.Embedding(config['num_speakers'], config['num_speaker_embeddings'])
         self.qnt_embedding = nn.Embedding(config['num_qnt_symbols'], config['num_symbol_embeddings'])
-        self.ar_transformer = QntARTransformer()
-        self.nar_transformer = QntNARTransformer()
+        self.ar_transformer = QntARTransformer(config)
+        self.nar_transformer = QntNARTransformer(config)
 
         self.bos_token_id = 1024
         self.eos_token_id = 1025
