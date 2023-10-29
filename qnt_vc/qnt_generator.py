@@ -47,11 +47,13 @@ def data_processing(data):
     _src_id, _tgt_id= [], []
 
     for source, target, source_id, target_id in data:
-        C, N, T = source.shape
+        print(type(source))
+        print(type(target))
+        #C, N, T = source.shape
         _src.append(source)
         _src_id.append(source_id)
 
-        C, N, T = target.shape
+        #C, N, T = target.shape
         _tgt.append(target)
         _tgt_id.append(target_id)
 
