@@ -18,7 +18,7 @@ def main(config:dict, checkpoint_path=None):
             
     train_dataset = QntSpeechDataset(source_path=config['dataset']['train']['source_path'], 
                                      target_path=config['dataset']['train']['target_path'], 
-                                     speaker_path=config['dataset']['speaker_path'], 
+                                     speaker_path=config['dataset']['train']['speaker_path'], 
                                      rate=config['dataset']['random_select']
     )
     
@@ -30,7 +30,7 @@ def main(config:dict, checkpoint_path=None):
 
     valid_dataset = QntSpeechDataset(source_path=config['dataset']['valid']['source_path'], 
                                      target_path=config['dataset']['valid']['target_path'], 
-                                     speaker_path=config['dataset']['speaker_path'], 
+                                     speaker_path=config['dataset']['valid']['speaker_path'], 
                                      rate=0.
     )  
     valid_loader = data.DataLoader(dataset=valid_dataset,
