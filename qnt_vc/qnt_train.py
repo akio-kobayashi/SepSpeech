@@ -10,6 +10,11 @@ from argparse import ArgumentParser
 import yaml
 import warnings
 
+import torch.multiprocessing as multiprocessing
+if multiprocessing.get_start_method() == 'fork':
+    multiprocessing.set_start_method('spawn', force=True)
+    print("{} setup done".format(multiprocessing.get_start_method()))
+
 warnings.filterwarnings('ignore')
 
 def main(config:dict, checkpoint_path=None):
@@ -56,7 +61,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, default=None)
-    parser.add_argument('--gpus', nargs='*', type=int, default=[0])
+    parser.add_argument('--gpus', nargs='*', type=int)
     args=parser.parse_args()
 
     torch.set_float32_matmul_precision('high')
