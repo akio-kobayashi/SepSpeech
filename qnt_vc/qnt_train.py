@@ -10,10 +10,12 @@ from argparse import ArgumentParser
 import yaml
 import warnings
 
+'''
 import torch.multiprocessing as multiprocessing
 if multiprocessing.get_start_method() == 'fork':
     multiprocessing.set_start_method('spawn', force=True)
     print("{} setup done".format(multiprocessing.get_start_method()))
+'''
 
 warnings.filterwarnings('ignore')
 
