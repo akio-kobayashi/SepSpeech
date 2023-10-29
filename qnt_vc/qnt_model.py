@@ -26,7 +26,7 @@ class PositionEncoding(nn.Module):
 class QntVoiceConversionModel(nn.Module):
     def __init__(self, config):
         super().__init__()        
-        self.speaker_embedding = nn.Embedding(config['num_speakers']['num_speaker_embeddings'])
+        self.speaker_embedding = nn.Embedding(config['num_speakers'], config['num_speaker_embeddings'])
         self.qnt_embedding = nn.Embedding(config['num_qnt_symbols'], config['num_symbol_embeddings'])
         self.ar_transformer = QntARTransformer()
         self.nar_transformer = QntNARTransformer()
