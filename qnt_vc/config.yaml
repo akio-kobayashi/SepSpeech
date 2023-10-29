@@ -4,13 +4,13 @@ dataset:
     num_workers: 1
   random_select: 0.1
   train:
-    source_path: 'audio/csv/qnt_jnas_train.csv'
-    target_path: 'audio/csv/qnt_deaf_train.csv'
-    speaker_path: 'audio/csv/speakers.json'
+    source_path: 'audio/vc/qnt_jnas_train.csv'
+    target_path: 'audio/vc/qnt_deaf_train.csv'
+    speaker_path: 'audio/vc/speakers.json'
   valid:  
-    soruce_path: 'audio/csv/qnt_jnas_valid.csv'
-    target_path: 'audio/csv/qnt_deaf_valid.csv'
-    speaker_path: 'audio/csv/speakers.json'
+    soruce_path: 'audio/vc/qnt_jnas_valid.csv'
+    target_path: 'audio/vc/qnt_deaf_valid.csv'
+    speaker_path: 'audio/vc/speakers.json'
   test:
     csv_path: 
     enroll_path: 
