@@ -8,7 +8,7 @@ dataset:
     target_path: 'audio/vc/qnt_deaf_train.csv'
     speaker_path: 'audio/vc/speakers.json'
   valid:  
-    soruce_path: 'audio/vc/qnt_jnas_valid.csv'
+    source_path: 'audio/vc/qnt_jnas_valid.csv'
     target_path: 'audio/vc/qnt_deaf_valid.csv'
     speaker_path: 'audio/vc/speakers.json'
   test:
