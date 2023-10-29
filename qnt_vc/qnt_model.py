@@ -129,6 +129,7 @@ class QntBaseTransformer(nn.Module):
             transformer.encoder.shape = (b c t (num_symbols + num_speakers))
             transformer.decoder.shape = (b c t (num_symbols + num_speakers))
         '''
+        super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         d_model = config['num_symbol_embeddings'] + config['num_speaker_embeddings']
         self.position_encoding = PositionEncoding(d_model, max_len=8)
