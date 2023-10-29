@@ -6,6 +6,9 @@ bos_token_id = 1024
 eos_token_id = 1025
 
 def make_batch(src, tgt, src_id, tgt_id, ar=True, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     _src, _tgt = [], []
     _src_lengths, _tgt_lengths = [], []
     _src_id, _tgt_id = [], []
