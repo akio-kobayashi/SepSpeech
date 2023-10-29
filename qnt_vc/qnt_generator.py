@@ -26,7 +26,6 @@ class QntSpeechDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         row = self.src_df.iloc[idx]
-        print(row['source'])
         source,_ = torch.load(row['source'], map_location=torch.device('cpu'))
         source = rearrange(source, 'f c t -> c t f')
         source_id = self.speaker2id[row['speaker']]
@@ -57,3 +56,24 @@ def data_processing(data):
         _tgt_id.append(target_id)
 
     return _src, _src_id, _tgt, _tgt_id
+
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    import yaml
+    import pandas as pd
+
+    parser = ArgumentParser()
+    parser.add_argument('--config', type=str, required=True)
+    parser.add_argument('--gpus', nargs='*', type=int)
+    args=parser.parse_args()
+
+    with open(args.config, 'r') as yf:
+        config = yaml.safe_load(yf)
+    
+    df = pd.read_csv(config['dataset']['train']['source_path'])
+    for index, row in df.iterrows():
+        data = torch.load(row['source'])
+    df = pd.read_csv(config['dataset']['train']['target_path'])
+    for index, row in df.iterrows():
+        data = torch.load(row['source'])
+        
