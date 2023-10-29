@@ -72,8 +72,9 @@ if __name__ == '__main__':
     
     df = pd.read_csv(config['dataset']['train']['source_path'])
     for index, row in df.iterrows():
+        print(row['source'])
         data = torch.load(row['source'])
     df = pd.read_csv(config['dataset']['train']['target_path'])
     for index, row in df.iterrows():
+        print(row['source'])
         data = torch.load(row['source'])
-        
