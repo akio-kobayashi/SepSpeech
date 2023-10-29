@@ -20,8 +20,8 @@ class LitVoiceConversion(pl.LightningModule):
 
         self.save_hyperparameters()
 
-    def forward(self, src:Tensor, tgt:Tensor, src_id:Tensor, tgt_id:Tensor, src_len, tgt_len):
-        return self.model(src, tgt, src_id, tgt_id, src_len, tgt_len)
+    def forward(self, src:Tensor, tgt:Tensor, src_id:Tensor, tgt_id:Tensor):
+        return self.model(src, tgt, src_id, tgt_id)
 
     def compute_ar_loss(self, ar_outputs, targets, valid=False):
         _targets = []
