@@ -19,6 +19,7 @@ def make_batch(src, tgt, src_id, tgt_id, ar=True, device=None):
         _src.append(rearrange(_s, 'c t f -> t c f'))    
         _src_id.append(src_id)
 
+        print(type(_t))
         if ar is True:
             _t =  append_special_tokens(_t, bos=True)
         _, T, _ = _t.shape
