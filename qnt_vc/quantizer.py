@@ -14,7 +14,7 @@ def main(args):
         qnt_data = encoder.encode_from_file(path)
         path = os.path.join(args.output_root, os.path.splitext(os.path.basename(row['source']))[0] + '.pt')
         qnts.append(path)
-        torch.save(qnt_data, path)
+        torch.save(qnt_data.cpu(), path)
 
     df['source'] = qnts
     df.to_csv(args.output_csv)
