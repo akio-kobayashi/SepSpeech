@@ -33,7 +33,7 @@ class QntSpeechDataset(torch.utils.data.Dataset):
 
         if np.random.rand() > self.rate :
             row = self.tgt_df.query('utterance=@source_utterance').sample()
-            target,_ = torchaudio.load(row['target'])
+            target,_ = torch.load(row['target'], map_location=torch.device('cpu'))
             target = rearrange(target, 'f c t -> c t f')
             target_id = self.speaker2id(row['speaker'])
         else:
