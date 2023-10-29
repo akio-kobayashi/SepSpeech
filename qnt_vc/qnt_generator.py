@@ -26,6 +26,7 @@ class QntSpeechDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         row = self.src_df.iloc[idx]
+        print(row['source'])
         source,_ = torch.load(row['source'], map_location=torch.device('cpu'))
         source = rearrange(source, 'f c t -> c t f')
         source_id = self.speaker2id[row['speaker']]
