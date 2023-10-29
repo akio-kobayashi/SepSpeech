@@ -47,8 +47,6 @@ def data_processing(data):
     _src_id, _tgt_id= [], []
 
     for source, target, source_id, target_id in data:
-        print(type(source))
-        print(type(target))
         #C, N, T = source.shape
         _src.append(source)
         _src_id.append(source_id)
@@ -57,7 +55,7 @@ def data_processing(data):
         _tgt.append(target)
         _tgt_id.append(target_id)
 
-    return _src, _src_id, _tgt, _tgt_id
+    return _src, _tgt, _src_id, _tgt_id
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

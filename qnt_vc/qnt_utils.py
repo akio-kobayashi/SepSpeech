@@ -13,14 +13,12 @@ def make_batch(src, tgt, src_id, tgt_id, ar=True, device=None):
     _src_lengths, _tgt_lengths = [], []
     _src_id, _tgt_id = [], []
 
-    print(type(tgt))
     for _s, _t in zip(src, tgt):
         _, T, _ = _s.shape
         _src_lengths.append(T)
         _src.append(rearrange(_s, 'c t f -> t c f'))    
         _src_id.append(src_id)
 
-        print(type(_t))
         if ar is True:
             _t =  append_special_tokens(_t, bos=True)
         _, T, _ = _t.shape
