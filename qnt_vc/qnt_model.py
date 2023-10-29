@@ -142,8 +142,7 @@ class QntBaseTransformer(nn.Module):
             dim_feedforward=config['dim_feedforward'], 
             dropout=config['dropout'], 
             batch_first=True, 
-            norm_first=False, 
-            bias=True
+            norm_first=False 
         )
         d_out = config['num_symbol_embeddings']
         self.feedforward = nn.Linear(d_model, d_out)
