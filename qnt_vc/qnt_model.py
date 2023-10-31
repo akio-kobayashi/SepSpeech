@@ -7,11 +7,11 @@ import qnt_vc.qnt_utils as U
 
 class PositionEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=2048):
-        super(PositionEncoding, self).__init__()
+        super().__init__()
         self.dropout = nn.Dropout(dropout)
 
         pe = torch.zeros(max_len, d_model)
-#        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        #position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         position = rearrange(torch.arange(0, max_len, dtype=torch.float), '(t f) -> t f', t=max_len)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0)/d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
@@ -20,6 +20,8 @@ class PositionEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
+        print(self.pe.shape)
+        print(x.shape)
         x = x + self.pe[:, :x.shape[1], :]
         return self.dropout(x)
 
@@ -41,22 +43,24 @@ class QntVoiceConversionModel(nn.Module):
             _src, _tgt, _src_id, _tgt_id, _src_lengths, _tgt_lengths = U.make_batch(src, tgt, src_id, tgt_id, ar=True)
         else:
             _src, _tgt, _src_id, _tgt_id, _src_lengths, _tgt_lengths = U.make_batch(src, tgt, src_id, tgt_id, ar=False)
-        
-        if ar is True:
-            _src = rearrange(_src[:, 0, :, :], '(b c) t f -> b c t f', c=1) # b c t f
-            _tgt = rearrange(_tgt[:, 0, :, :], '(b c) t f -> b c t f', c=1) # b c t f
-        else:
-            _src = rearrange(_src[:, :-1, :, :], '(b c) t f -> b c t f', c=1) # b c t f
-            _tgt = rearrange(_tgt[:, :-1, :, :], '(b c) t f -> b c t f', c=1) # b c t f
 
         B, C, S, _ = _src.shape
-        _src_id = rearrange(_src_id, 'b -> b c t f', c=1, t=1, f=1)
+        print(_src.shape)
+        if ar is True:
+            _src = rearrange(_src[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
+            _tgt = rearrange(_tgt[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
+        else:
+            _src = rearrange(_src[:, :-1, :, :], 'b c t f -> b c (t f)', c=C-1) # b c t f
+            _tgt = rearrange(_tgt[:, :-1, :, :], 'b c t f -> b c (t f)', c=C-1) # b c t f
+
+        B, C, S = _src.shape
+        _src_id = rearrange(_src_id, '(b c t) -> b c t', c=1, t=1)
         _src_embed = self.speaker_embedding(_src_id).repeat((1, C, S, 1))
         _src = self.qnt_embedding(_src)
         _src = torch.cat([_src, _src_embed], dim=-1)
 
-        B, C, T, _ = _tgt.shape
-        _tgt_id = rearrange(_tgt_id, 'b -> b c t f', c=1, t=1, f=1)
+        B, C, T = _tgt.shape
+        _tgt_id = rearrange(_tgt_id, '(b c t) -> b c t', c=1, t=1)
         _tgt_embed = self.speaker_embedding(_tgt_id).repeat((1, C, T, 1))
         _tgt = self.qnt_embedding(_tgt)
         _tgt = torch.cat([_tgt, _tgt_embed], dim=-1)
@@ -132,7 +136,7 @@ class QntBaseTransformer(nn.Module):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         d_model = config['num_symbol_embeddings'] + config['num_speaker_embeddings']
-        self.position_encoding = PositionEncoding(d_model, max_len=8)
+        self.position_encoding = PositionEncoding(d_model, max_len=4096)
 
         self.model = nn.Transformer(
             d_model=d_model, 
@@ -161,6 +165,7 @@ class QntARTransformer(QntBaseTransformer):
 
         B, S, _ = src.shape
         B, T, _ = tgt.shape
+        print(src.shape)
         src = self.position_encoding(src)
         tgt = self.position_encoding(tgt)
 
@@ -171,7 +176,8 @@ class QntARTransformer(QntBaseTransformer):
 
         # decoder
         outputs = self.model.decoder(tgt, memory, tgt_mask=tgt_mask, 
-                                     tgt_key_padding_mask=tgt_key_padding_mask,tgt_is_causal=True)
+                                     tgt_key_padding_mask=tgt_key_padding_mask)
+                                     #tgt_is_causal=True)
         outputs = self.feedforward(outputs)
 
         # to (b c t f)
