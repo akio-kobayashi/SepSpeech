@@ -20,8 +20,8 @@ class PositionEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        print(self.pe.shape)
-        print(x.shape)
+        #print(self.pe.shape)
+        #print(x.shape)
         x = x + self.pe[:, :x.shape[1], :]
         return self.dropout(x)
 
@@ -48,7 +48,7 @@ class QntVoiceConversionModel(nn.Module):
             _src_lengths = _tgt_lengths
 
         B, C, S, _ = _src.shape
-        print(_src.shape)
+        #print(_src.shape)
         if ar is True:
             _src = rearrange(_src[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
             _tgt = rearrange(_tgt[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
@@ -168,7 +168,7 @@ class QntARTransformer(QntBaseTransformer):
 
         B, S, _ = src.shape
         B, T, _ = tgt.shape
-        print(src.shape)
+        #print(src.shape)
         src = self.position_encoding(src)
         tgt = self.position_encoding(tgt)
 

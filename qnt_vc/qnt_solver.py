@@ -23,8 +23,8 @@ class LitVoiceConversion(pl.LightningModule):
     def forward(self, src:Tensor, tgt:Tensor, src_id:Tensor, tgt_id:Tensor):
         return self.model(src, tgt, src_id, tgt_id)
 
-    def compute_ar_loss(self, outputs, targets, valid=False):
-        _loss = self.ce_loss(ar_outputs, _targets)
+    def compute_loss(self, outputs, targets, valid=False):
+        _loss = self.ce_loss(outputs, targets)
         return _loss
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
