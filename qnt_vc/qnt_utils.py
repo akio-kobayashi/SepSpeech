@@ -5,6 +5,15 @@ from einops import rearrange
 bos_token_id = 1024
 eos_token_id = 1025
 
+def make_targets(tgt):
+    _tgt = []
+    for _t in tgt:
+        _t = append_special_tokens(_t, bos=False)
+        _tgt.append(_t)
+    _tgt = nn.utils.rnn.pad_sequence(_tgt, batch_first=True, padding_value=eos_token_id).to(device)
+    _tgt = rearrange(_tgt, 'b t c f -> b c t f')
+    return _tgt
+
 def make_batch(src, tgt, src_id, tgt_id, ar=True, device=None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
