@@ -45,22 +45,32 @@ class QntVoiceConversionModel(nn.Module):
         if ar is True:
             _src = rearrange(_src[:, 0, :, :], '(b c) t f -> b c t f', c=1) # b c t f
             _tgt = rearrange(_tgt[:, 0, :, :], '(b c) t f -> b c t f', c=1) # b c t f
+            B, C, S, _ = _src.shape
+            _src_id = rearrange(_src_id, 'b -> b c t f', c=1, t=1, f=1)
+            _src_embed = self.speaker_embedding(_src_id).repeat((1, C, S, 1))
+            _src = self.qnt_embedding(_src)
+            _src = torch.cat([_src, _src_embed], dim=-1)
+
+            B, C, T, _ = _tgt.shape
+            _tgt_id = rearrange(_tgt_id, 'b -> b c t f', c=1, t=1, f=1)
+            _tgt_embed = self.speaker_embedding(_tgt_id).repeat((1, C, T, 1))
+            _tgt = self.qnt_embedding(_tgt)
+            _tgt = torch.cat([_tgt, _tgt_embed], dim=-1)
         else:
-            _src = rearrange(_src[:, :-1, :, :], '(b c) t f -> b c t f', c=1) # b c t f
-            _tgt = rearrange(_tgt[:, :-1, :, :], '(b c) t f -> b c t f', c=1) # b c t f
+            _src = _tgt[:, :-1, :, :] # b :c-1 t f
+            _tgt = _tgt[:, 1:, :, :]  # b 1: t f
+            B, C, S, _ = _src.shape
+            _src_id = rearrange(_tgt_id, 'b -> b c t f', c=1, t=1, f=1)
+            _src_embed = self.speaker_embedding(_src_id).repeat((1, C, S, 1))
+            _src = self.qnt_embedding(_src)
+            _src = torch.cat([_src, _src_embed], dim=-1)
 
-        B, C, S, _ = _src.shape
-        _src_id = rearrange(_src_id, 'b -> b c t f', c=1, t=1, f=1)
-        _src_embed = self.speaker_embedding(_src_id).repeat((1, C, S, 1))
-        _src = self.qnt_embedding(_src)
-        _src = torch.cat([_src, _src_embed], dim=-1)
-
-        B, C, T, _ = _tgt.shape
-        _tgt_id = rearrange(_tgt_id, 'b -> b c t f', c=1, t=1, f=1)
-        _tgt_embed = self.speaker_embedding(_tgt_id).repeat((1, C, T, 1))
-        _tgt = self.qnt_embedding(_tgt)
-        _tgt = torch.cat([_tgt, _tgt_embed], dim=-1)
-
+            B, C, T, _ = _tgt.shape
+            _tgt_id = rearrange(_tgt_id, 'b -> b c t f', c=1, t=1, f=1)
+            _tgt_embed = self.speaker_embedding(_tgt_id).repeat((1, C, T, 1))
+            _tgt = self.qnt_embedding(_tgt)
+            _tgt = torch.cat([_tgt, _tgt_embed], dim=-1)
+        
         return _src, _tgt, _src_lengths, _tgt_lengths
 
     def forward(self, src, tgt, src_id, tgt_id):
@@ -197,6 +207,7 @@ class QntNARTransformer(QntBaseTransformer):
 
     def forward(self, src, tgt):
         # from (b c t f) 
+        assert src.shape[-2] == tgt.shape[-2]        
         B,_,_,_ = src.shape
         src = rearrange(src, 'b c t f -> (b t) c f')
         tgt = rearrange(tgt, 'b c t f -> (b t) c f')
