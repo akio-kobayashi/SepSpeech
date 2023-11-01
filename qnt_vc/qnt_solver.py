@@ -23,40 +23,15 @@ class LitVoiceConversion(pl.LightningModule):
     def forward(self, src:Tensor, tgt:Tensor, src_id:Tensor, tgt_id:Tensor):
         return self.model(src, tgt, src_id, tgt_id)
 
-    def compute_ar_loss(self, ar_outputs, targets, valid=False):
-        _targets = []
-        for b in range(len(targets)):
-            _tgt = rearrange(targets[b][0,:,:], '(c t) f -> c t f', c=1)
-            _targets.append(rearrange(U.append_special_tokens(_tgt, bos=False), 'c t f -> t c f'))
-        _targets = nn.utils.rnn.pad_sequence(_targets, batch_first=True, padding_value=-1).to('cuda')
-        _targets = rearrange(_targets, 'b t c f -> b c t f')            
+    def compute_ar_loss(self, outputs, targets, valid=False):
         _loss = self.ce_loss(ar_outputs, _targets)
-        if valid is True:
-            self.log_dict({'valid_ar_loss': _loss})
-        else:
-            self.log_dict({'train_ar_loss': _loss})
-        return _loss
-    
-    def compute_nar_loss(self, nar_outputs, targets, valid=False):
-        _targets = []
-        for b in range(len(targets)):
-            _tgt = targets[b][1:,:,:]
-            _targets.append(rearrange(_tgt, 'c t f -> t c f'))
-        _targets = nn.utils.rnn.pad_sequence(_targets, batch_first=True, padding_value=-1).to('cuda')
-        _targets = rearrange(_targets, 'b t c f -> b c t f')            
-        _loss = self.ce_loss(nar_outputs, _targets)
-        if valid is True:
-            self.log_dict({'valid_nar_loss': _loss})
-        else:
-            self.log_dict({'train_nar_loss': _loss})
         return _loss
 
     def training_step(self, batch, batch_idx:int) -> Tensor:
         src, tgt, src_id, tgt_id = batch
 
-        ar_outputs, nar_outputs = self.forward(src, tgt, src_id, tgt_id)
-        _loss = self.compute_ar_loss(ar_outputs, tgt)
-        _loss += self.compute_nar_loss(nar_outputs, tgt)
+        outputs = self.forward(src, tgt, src_id, tgt_id)
+        _loss = self.compute_loss(outputs, tgt)
         self.log_dict({'train_loss': _loss})
 
         return _loss
@@ -64,9 +39,8 @@ class LitVoiceConversion(pl.LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         src, tgt, src_id, tgt_id = batch
 
-        ar_outputs, nar_outputs = self.forward(src, tgt, src_id, tgt_id)
-        _loss = self.compute_ar_loss(ar_outputs, tgt)
-        _loss += self.compute_nar_loss(nar_outputs, tgt)
+        outputs = self.forward(src, tgt, src_id, tgt_id)
+        _loss = self.compute_loss(outputs, tgt)
         self.log_dict({'valid_loss': _loss})
 
         return _loss
