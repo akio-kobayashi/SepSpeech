@@ -77,7 +77,7 @@ class QntVoiceConversionModel(nn.Module):
         nar_src, nar_tgt, src_lengths, tgt_lengths = self.make_batch(src, tgt, src_id, tgt_id, ar=False)
         nar_outputs = self.nar_transformer(nar_src, nar_tgt)
 
-        return [ar_outputs, nar_outputs]
+        return torch.cat([ar_outputs, nar_outputs], dim=1)
 
     def greedy_decode(self, src, src_id, tgt_id):
         B, C, S, _ = src.shape  
