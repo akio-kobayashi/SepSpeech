@@ -13,7 +13,7 @@ def make_targets(tgt):
         _t = append_special_tokens(_t, bos=False)
         _tgt.append(rearrange(_t, 'c t f -> t c f'))
     _tgt = nn.utils.rnn.pad_sequence(_tgt, batch_first=True, padding_value=eos_token_id).to(device)
-    _tgt = rearrange(_tgt, 'b t c f -> b c t f')
+    _tgt = rearrange(_tgt, 'b t c f -> b c (t f)')
     return _tgt
 
 def make_batch(src, tgt, src_id, tgt_id, ar=True, device=None):
