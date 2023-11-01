@@ -40,6 +40,7 @@ class LitVoiceConversion(pl.LightningModule):
         src, tgt, src_id, tgt_id = batch
 
         outputs = self.forward(src, tgt, src_id, tgt_id)
+        print(outputs.shape)
         _loss = self.compute_loss(outputs, tgt)
         self.log_dict({'valid_loss': _loss})
 
