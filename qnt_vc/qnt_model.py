@@ -43,6 +43,9 @@ class QntVoiceConversionModel(nn.Module):
             _src, _tgt, _src_id, _tgt_id, _src_lengths, _tgt_lengths = U.make_batch(src, tgt, src_id, tgt_id, ar=True)
         else:
             _src, _tgt, _src_id, _tgt_id, _src_lengths, _tgt_lengths = U.make_batch(src, tgt, src_id, tgt_id, ar=False)
+            _src = _tgt
+            _src_id = _tgt_id
+            _src_lengths = _tgt_lengths
 
         B, C, S, _ = _src.shape
         print(_src.shape)
@@ -50,8 +53,8 @@ class QntVoiceConversionModel(nn.Module):
             _src = rearrange(_src[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
             _tgt = rearrange(_tgt[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
         else:
-            _src = rearrange(_src[:, :-1, :, :], 'b c t f -> b c (t f)', c=C-1) # b c t f
-            _tgt = rearrange(_tgt[:, :-1, :, :], 'b c t f -> b c (t f)', c=C-1) # b c t f
+            _src = _src[:, 1:, :, :]  # b c t f
+            _tgt = _tgt[:, :-1, :, :] # b c t f
 
         B, C, S = _src.shape
         _src_id = rearrange(_src_id, '(b c t) -> b c t', c=1, t=1)
