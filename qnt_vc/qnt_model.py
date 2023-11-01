@@ -53,8 +53,8 @@ class QntVoiceConversionModel(nn.Module):
             _src = rearrange(_src[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
             _tgt = rearrange(_tgt[:, 0, :, :], '(b c) t f -> b c (t f)', c=1) # b c t f
         else:
-            _src = _src[:, 1:, :, :]  # b c t f
-            _tgt = _tgt[:, :-1, :, :] # b c t f
+            _src = rearrange(_src[:, 1:, :, :], 'b c t f -> b c (t f)')  # b c t f
+            _tgt = rearrange(_tgt[:, :-1, :, :], 'b c t f -> b c (t f)') # b c t f
 
         B, C, S = _src.shape
         _src_id = rearrange(_src_id, '(b c t) -> b c t', c=1, t=1)
