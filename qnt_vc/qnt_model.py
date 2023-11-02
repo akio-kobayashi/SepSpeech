@@ -232,7 +232,7 @@ class QntNARTransformer(QntBaseTransformer):
         src = self.position_encoding(src)
 
         # encoder
-        outputs = self.model.encoder(src, mask=mask)
+        outputs = self.model(src, mask=mask)
         outputs = self.feedforward(outputs)
 
         # to (b c t f)
