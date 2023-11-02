@@ -144,10 +144,10 @@ class QntBaseTransformer(nn.Module):
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.d_model = config['num_symbol_embeddings'] + config['num_speaker_embeddings']
-        self.position_encoding = PositionEncoding(d_model, max_len=4096)
+        self.position_encoding = PositionEncoding(self.d_model, max_len=4096)
 
         d_out = config['num_qnt_symbols']
-        self.feedforward = nn.Linear(d_model, d_out)
+        self.feedforward = nn.Linear(self.d_model, d_out)
 
     def forward(self, src, tgt, src_lengths, tgt_lengths):
         raise NotImplementedError
