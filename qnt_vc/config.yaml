@@ -17,13 +17,13 @@ dataset:
     noise_path:
 trainer:
   accelerator: 'auto'
-  accumulate_grad_batches: 5
+  accumulate_grad_batches: 128
   max_epochs: 400
   precision: '16-mixed'
   profiler: 'simple'
   gradient_clip_val: 5.
 optimizer:
-  lr: 1.e-5
+  lr: 1.e-4
 logger:
   save_dir: './log_qnt_vc'
   version: 1
@@ -38,9 +38,9 @@ checkpoint:
 # models
 transformer:
   num_speakers: 338
-  num_speaker_embeddings: 256
+  num_speaker_embeddings: 512
   num_qnt_symbols: 1026
-  num_symbol_embeddings: 256
+  num_symbol_embeddings: 512
   num_channels: 8
   max_length: 2048
   num_heads: 16
