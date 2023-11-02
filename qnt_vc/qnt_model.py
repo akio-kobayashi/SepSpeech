@@ -227,7 +227,7 @@ class QntNARTransformer(QntBaseTransformer):
     def forward(self, src, src_lengths):
         # from (b c t f) 
         B,C,_,_= src.shape
-        mask, _ = self.create_mask(C)
+        mask = self.create_mask(C)
         src = rearrange(src, 'b c t f -> (b t) c f')
         src = self.position_encoding(src)
 
