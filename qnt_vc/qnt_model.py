@@ -221,15 +221,13 @@ class QntNARTransformer(QntBaseTransformer):
             ),
             num_layers=config['num_nar_layers'], 
         )
-    def create_mask(self, B, S):
-        src_mask = self.model.generate_square_subsequent_mask(S).to(self.device)
-
-        return src_mask
+    def create_mask(self, S):
+        return torch.triu( torch.full((S, S), float('-inf'), dtype=torch.get_default_dtype(), device=self.device),diagonal=1)
     
     def forward(self, src, src_lengths):
         # from (b c t f) 
         B,C,_,_= src.shape
-        mask, _ = self.create_mask(B, C)
+        mask, _ = self.create_mask(C)
         src = rearrange(src, 'b c t f -> (b t) c f')
         src = self.position_encoding(src)
 
