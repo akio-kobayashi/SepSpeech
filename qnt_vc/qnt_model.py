@@ -217,7 +217,7 @@ class QntNARTransformer(QntBaseTransformer):
                 dim_feedforward=config['dim_feedforward'], 
                 dropout=config['dropout'],
                 batch_first=True,
-                norm_firat=False
+                norm_first=False
             ),
             num_layers=config['num_nar_layers'], 
         )
