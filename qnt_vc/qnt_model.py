@@ -153,7 +153,7 @@ class QntBaseTransformer(nn.Module):
             batch_first=True, 
             norm_first=False 
         )
-        d_out = config['num_symbol_embeddings']
+        d_out = config['num_qnt_symbols']
         self.feedforward = nn.Linear(d_model, d_out)
 
     def forward(self, src, tgt, src_lengths, tgt_lengths):
