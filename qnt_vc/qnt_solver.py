@@ -24,9 +24,9 @@ class LitVoiceConversion(pl.LightningModule):
         return self.model(src, tgt, src_id, tgt_id)
 
     def compute_loss(self, outputs, targets, valid=False):
-        print(outputs.shape)
-        print(targets.shape)
-        exit(1)
+        #print(outputs.shape)
+        #print(targets.shape)
+        #exit(1)
         _loss = self.ce_loss(outputs, targets)
         return _loss
 
