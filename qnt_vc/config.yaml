@@ -46,5 +46,6 @@ transformer:
   num_heads: 16
   num_encoder_layers: 6
   num_decoder_layers: 6
+  num_nar_layers: 12
   dim_feedforward: 2048
   dropout: 0.1
