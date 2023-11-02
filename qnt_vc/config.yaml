@@ -23,7 +23,7 @@ trainer:
   profiler: 'simple'
   gradient_clip_val: 5.
 optimizer:
-  lr: 1.e-4
+  lr: 1.e-5
 logger:
   save_dir: './log_qnt_vc'
   version: 1
