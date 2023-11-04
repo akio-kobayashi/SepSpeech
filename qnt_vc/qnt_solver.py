@@ -34,6 +34,7 @@ class LitVoiceConversion(pl.LightningModule):
         output_indices = torch.argmax(outputs, dim=-1) # b c t
         _tgt = []
         for _t in targets:
+            _t = U.append_special_tokens(_t, bos=False)
             _tgt.append(rearrange(_t, 'c t f -> t c f'))
         _tgt = nn.utils.rnn.pad_sequence(_tgt, batch_first=True, padding_value=-1).to(outputs.device)
         _tgt = rearrange(_tgt, 'b t c f -> b c (t f)')
