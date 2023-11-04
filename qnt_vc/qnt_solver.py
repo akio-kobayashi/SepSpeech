@@ -42,7 +42,7 @@ class LitVoiceConversion(pl.LightningModule):
         #print(output_indices.shape)
         #print(_tgt.shape)
         num_hits = torch.sum(torch.where(output_indices == _tgt, 1., 0.))
-        ler = ((num_labels - num_hits)/num_labels).cpu().detach().numpy()[0]
+        ler = ((num_labels - num_hits)/num_labels).cpu().detach().numpy()
         return ler
     
     def training_step(self, batch, batch_idx:int) -> Tensor:
