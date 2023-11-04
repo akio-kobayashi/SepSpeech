@@ -56,7 +56,7 @@ class LitVoiceConversion(pl.LightningModule):
 
         outputs = self.forward(src, tgt, src_id, tgt_id)
         _loss = self.compute_loss(rearrange(outputs, 'b c t f -> (b c t) f'), U.make_targets(tgt))
-        _ler = self.compute_ler(rearrange(outputs, tgt))
+        _ler = self.compute_ler(outputs, tgt)
 
         self.log_dict({'valid_loss': _loss})
         self.log_dict({'valid_ler': _ler})
