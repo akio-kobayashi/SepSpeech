@@ -44,8 +44,8 @@ transformer:
   num_channels: 8
   max_length: 2048
   num_heads: 16
-  num_encoder_layers: 16
-  num_decoder_layers: 16
+  num_encoder_layers: 12
+  num_decoder_layers: 12
   num_nar_layers: 16
   dim_feedforward: 2048
   dropout: 0.1
