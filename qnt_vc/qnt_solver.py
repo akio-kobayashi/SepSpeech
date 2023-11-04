@@ -38,7 +38,7 @@ class LitVoiceConversion(pl.LightningModule):
         _tgt = nn.utils.rnn.pad_sequence(_tgt, batch_first=True, padding_value=-1).to(outputs.device)
         _tgt = rearrange(_tgt, 'b t c f -> b c (t f)')
         num_labels = torch.sum(torch.where(_tgt >= 0, 1., 0.))
-        num_hits = torch.sum(torch.where(outputs == targets, 1., 0.))
+        num_hits = torch.sum(torch.where(outputs == _tgt, 1., 0.))
         ler = ((num_labels - num_hits)/num_labels).cpu().detach().numpy()[0]
         return ler
     
