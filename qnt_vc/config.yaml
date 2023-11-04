@@ -38,9 +38,9 @@ checkpoint:
 # models
 transformer:
   num_speakers: 338
-  num_speaker_embeddings: 512
+  num_speaker_embeddings: 256
   num_qnt_symbols: 1026
-  num_symbol_embeddings: 512
+  num_symbol_embeddings: 256
   num_channels: 8
   max_length: 2048
   num_heads: 16
