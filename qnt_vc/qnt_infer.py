@@ -36,7 +36,7 @@ def main(args):
         source = torch.load(row['source'])
         source = rearrange(source, '(b f) c t -> b c t f', b=1)
         output = model.model.greedy_decode(source, source_speaker, target_speaker)
-        output = rearrange(output, 'b c t f -> (b c) t f', b=1)
+        #output = rearrange(output, 'b c t -> (b c) t f', b=1)
 
         path = os.path.join(args.output_dir, row['speaker']+'_'+args.target_speaker+_+row['utterance']+'.pt')
         torch.save(path)

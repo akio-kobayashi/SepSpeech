@@ -24,12 +24,24 @@ class LitVoiceConversion(pl.LightningModule):
         return self.model(src, tgt, src_id, tgt_id)
 
     def compute_loss(self, outputs, targets, valid=False):
-        #print(outputs.shape)
-        #print(targets.shape)
-        #exit(1)
         _loss = self.ce_loss(outputs, targets)
         return _loss
 
+    '''
+        compute label error rate
+    '''
+    def compute_ler(self, outputs, targets, valid=False):
+        output_indices = torch.argmax(outputs, dim=-1) # b c t
+        _tgt = []
+        for _t in targets:
+            _tgt.append(rearrange(_t, 'c t f -> t c f'))
+        _tgt = nn.utils.rnn.pad_sequence(_tgt, batch_first=True, padding_value=-1).to(outputs.device)
+        _tgt = rearrange(_tgt, 'b t c f -> b c (t f)')
+        num_labels = torch.sum(torch.where(_tgt >= 0, 1., 0.))
+        num_hits = torch.sum(torch.where(outputs == targets, 1., 0.))
+        ler = ((num_labels - num_hits)/num_labels).cpu().detach().numpy()[0]
+        return ler
+    
     def training_step(self, batch, batch_idx:int) -> Tensor:
         src, tgt, src_id, tgt_id = batch
 
@@ -44,7 +56,10 @@ class LitVoiceConversion(pl.LightningModule):
 
         outputs = self.forward(src, tgt, src_id, tgt_id)
         _loss = self.compute_loss(rearrange(outputs, 'b c t f -> (b c t) f'), U.make_targets(tgt))
+        _ler = self.compute_ler(rearrange(outputs, tgt))
+
         self.log_dict({'valid_loss': _loss})
+        self.log_dict({'valid_ler': _ler})
 
         return _loss
     
