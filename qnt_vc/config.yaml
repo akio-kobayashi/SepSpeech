@@ -17,16 +17,16 @@ dataset:
     noise_path:
 trainer:
   accelerator: 'auto'
-  accumulate_grad_batches: 128
+  accumulate_grad_batches: 8 #128
   max_epochs: 400
   precision: '16-mixed'
   profiler: 'simple'
   gradient_clip_val: 5.
 optimizer:
-  lr: 1.e-4
+  lr: 1.e-6
 logger:
   save_dir: './log_qnt_vc'
-  version: 1
+  version: 3
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
