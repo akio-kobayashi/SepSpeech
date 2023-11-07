@@ -41,8 +41,8 @@ def main(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")    
 
-    _pesq = PerceptualEvaluationSpeechQuality(sample_rate, 'wb').to(device)
-    _stoi = ShortTimeObjectiveIntelligibility(sample_rate, extended=True).to(device)
+    _pesq = PerceptualEvaluationSpeechQuality(args.sample_rate, 'wb').to(device)
+    _stoi = ShortTimeObjectiveIntelligibility(args.sample_rate, extended=True).to(device)
     
     df_out = pd.DataFrame(index=None, 
                           columns=['key', 'mixture', 'source', 'enroll', 'estimate', 'mix_result', 'est_result', 'mix_pesq', 'mix_stoi', 'mix_sdr', 'est_pesq', 'est_stoi', 'est_sdr'])
@@ -88,6 +88,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--input_csv', type=str)
     parser.add_argument('--output_csv', type=str)
+    parser.add_argument('--sample_rate', default=16000, type=int)
     args = parser.parse_args()
 
     main(args)
