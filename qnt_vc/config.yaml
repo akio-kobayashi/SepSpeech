@@ -1,6 +1,6 @@
 dataset:
   process:
-    batch_size: 4
+    batch_size: 2
     num_workers: 1
   random_select: 0.1
   train:
@@ -23,10 +23,10 @@ trainer:
   profiler: 'simple'
   gradient_clip_val: 5.
 optimizer:
-  lr: 1.e-6
+  lr: 1.e-5
 logger:
   save_dir: './log_qnt_vc'
-  version: 3
+  version: 4
   name: 'lightning_logs'
 checkpoint:
   monitor: 'valid_loss'
@@ -38,14 +38,14 @@ checkpoint:
 # models
 transformer:
   num_speakers: 338
-  num_speaker_embeddings: 256
+  num_speaker_embeddings: 384
   num_qnt_symbols: 1026
-  num_symbol_embeddings: 256
+  num_symbol_embeddings: 384
   num_channels: 8
   max_length: 2048
   num_heads: 16
   num_encoder_layers: 8
   num_decoder_layers: 8
   num_nar_layers: 12
-  dim_feedforward: 1024
+  dim_feedforward: 2048
   dropout: 0.1

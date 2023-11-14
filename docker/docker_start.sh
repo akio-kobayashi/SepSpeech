@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # uidは自分の計算機の/etc/passwdを見るなどして変更する
-uid=1001
+uid=1000
 image=pytorch:20230713
 
 docker run --shm-size 16394m \

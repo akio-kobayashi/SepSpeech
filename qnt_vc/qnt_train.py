@@ -47,7 +47,8 @@ def main(config:dict, checkpoint_path=None):
                                      collate_fn=lambda x: G.data_processing(x))
         
     callbacks = [
-        pl.callbacks.ModelCheckpoint( **config['checkpoint'])
+        pl.callbacks.ModelCheckpoint( **config['checkpoint']),
+        pl.callbacks.EarlyStopping(monitor="valid_ler", min_delta=0.00, patience=10, verbose=False, mode="min"
     ]
     logger = TensorBoardLogger(**config['logger'])
 
