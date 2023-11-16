@@ -5,9 +5,9 @@ import torch.utils.data as data
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from generator import SpeechDataset
-import generator
-from model import Transducer
+from generator_1d import SpeechDataset1D
+import generator_1d as g
+from model_1d import Transducer
 from metric import IterMeter
 import solver
 import numpy as np
@@ -46,22 +46,22 @@ def main():
 
     shuffle = False if config['analysis']['sort_by_len'] is True else False
     
-    train_dataset=SpeechDataset(config['dataset']['train']['csv_path'], config, 20, tokenizer, specaug=config['augment']['specaug'])
+    train_dataset=SpeechDataset1D(config['dataset']['train']['csv_path'], config, 20, tokenizer)
     train_loader =data.DataLoader(dataset=train_dataset,
                                   batch_size=config['dataset']['process']['batch_size'],
                                   shuffle=shuffle,
-                                  collate_fn=lambda x: generator.data_processing(x,'train'),
+                                  collate_fn=lambda x: g.data_processing(x,'train'),
                                   **kwargs)
-    valid_dataset=SpeechDataset(config['dataset']['valid']['csv_path'], config, 20, tokenizer, specaug=False)
+    valid_dataset=SpeechDataset1D(config['dataset']['valid']['csv_path'], config, 20, tokenizer)
     valid_loader=data.DataLoader(dataset=valid_dataset,
                                  batch_size=config['dataset']['process']['batch_size'],
                                  shuffle=shuffle,
-                                 collate_fn=lambda x: generator.data_processing(x, 'valid'))
-    eval_dataset=SpeechDataset(config['dataset']['test']['csv_path'], config, 0, tokenizer, specaug=False)
+                                 collate_fn=lambda x: g.data_processing(x, 'valid'))
+    eval_dataset=SpeechDataset1D(config['dataset']['test']['csv_path'], config, 20, tokenizer)
     eval_loader=data.DataLoader(dataset=eval_dataset,
                                 batch_size=1,
                                 shuffle=False,
-                                collate_fn=lambda x: generator.data_processing(x, 'eval'))
+                                collate_fn=lambda x: g.data_processing(x, 'eval'))
 
     # input_size, vocab_size, hidden_size, num_layers,
     # dropout=.5, blank=0, bidirectional=False

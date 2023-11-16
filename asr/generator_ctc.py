@@ -9,7 +9,6 @@ from asr_tokenizer import ASRTokenizer
 import yaml
 import specAugment.spec_augment_pytorch as augment
 from einops import rearrange
-#import spec_augment
 
 def compute_global_mean_std(csv_path, config):
     wav2spec = torchaudio.transforms.Spectrogram(
@@ -53,12 +52,13 @@ def compute_global_mean_std(csv_path, config):
 
     return mean, std
 
-class SpeechDataset(torch.utils.data.Dataset):
+class CTCSpeechDataset(torch.utils.data.Dataset):
 
-    def __init__(self, path, config:dict, segment=0, tokenizer=None, specaug=False):
-        super(SpeechDataset, self).__init__()
+    def __init__(self, path, ctc_path, config:dict, segment=0, tokenizer=None, ctc_tokenizer=None, specaug=False):
+        super().__init__()
 
         self.df = pd.read_csv(path)
+        self.df_ctc = pd.read_csv(ctc_path)
         
         if config['analysis']['sort_by_len']:
             self.df = self.df.sort_values('length')
@@ -105,10 +105,15 @@ class SpeechDataset(torch.utils.data.Dataset):
                 power=None
             )
         '''
+        
         self.tokenizer = tokenizer
         if self.tokenizer == None:
             self.tokenizer = ASRTokenizer(config['dataset']['tokenizer'], config['dataset']['max_length'])
 
+        self.ctc_tokenizer = ctc_tokenizer
+        if self.ctc_tokenizer == None:
+            self.ctc_tokenizer = ASRTokenizer(config['dataset']['ctc_tokenizer'], config['dataset']['max_length'])
+            
     def __len__(self):
         return len(self.df)
 
@@ -130,9 +135,10 @@ class SpeechDataset(torch.utils.data.Dataset):
         else:
         '''
         spec = self.wav2spec(source)
-         
+            
         melspec = torch.log(self.spec2mel(spec)+self.eps) # (1, n_mels, time)
         melspec = torch.t(melspec.squeeze()) # (time, n_mels)
+
         if self.specaug:
             #melspec=torch.t(spec_augment_pytorch.spec_augment(torch.t(melspec),frequency_masking_para=8))
             melspec=rearrange(augment.spec_augment( rearrange(melspec, '(b t) f -> b f t', b=1) ,frequency_masking_para=8), 'b f t -> (b t) f', b=1)
@@ -151,10 +157,20 @@ class SpeechDataset(torch.utils.data.Dataset):
             line = re.sub(pattern, ' ', line.strip())
             label = self.tokenizer.text2token(line)
             label = torch.tensor(label, dtype=torch.int32)
-            #label = torch.tensor(label)
         assert label is not None and len(label) > 0
 
-        return melspec, label, row['key']
+        key = row['key']
+        ctc_label_path = self.df_ctc.query('key==@key').iloc[0]['label']
+        ctc_label = None
+        assert os.path.exists(ctc_label_path) 
+        with open(ctc_label_path, 'r') as  f:
+            line = f.readline()
+            line = re.sub(pattern, ' ', line.strip())
+            ctc_label = self.ctc_tokenizer.text2token(line)
+            ctc_label = torch.tensor(ctc_label, dtype=torch.int32)
+        assert ctc_label is not None and len(ctc_label) > 0
+        
+        return melspec, label, ctc_label, key
 
 '''
     data_processing
@@ -163,25 +179,28 @@ class SpeechDataset(torch.utils.data.Dataset):
 def data_processing(data, data_type="train"):
     inputs = []
     labels = []
+    ctc_labels = []
     input_lengths=[]
     label_lengths=[]
+    ctc_label_lengths=[]
     keys = []
 
-    for input, label, key in data:
+    for input, label, ctc_label, key in data:
         """ inputs : (batch, time, feature) """
         # w/o channel
-        #inputs.append(torch.from_numpy(input.astype(np.float32)).clone())
         inputs.append(input)
-        #labels.append(torch.from_numpy(label.astype(np.int)).clone())
         labels.append(label)
+        ctc_labels.append(ctc_label)
         input_lengths.append(input.shape[0])
         label_lengths.append(len(label))
+        ctc_label_lengths.append(len(ctc_label))
         keys.append(key)
 
     inputs = nn.utils.rnn.pad_sequence(inputs, batch_first=True)
     labels = nn.utils.rnn.pad_sequence(labels, batch_first=True)
+    ctc_labels = nn.utils.rnn.pad_sequence(ctc_labels, batch_first=True)
 
-    return inputs, labels, input_lengths, label_lengths, keys
+    return inputs, labels, ctc_labels, input_lengths, label_lengths, ctc_label_lengths, keys
 
 
 if __name__=="__main__":

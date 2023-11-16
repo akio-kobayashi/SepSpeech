@@ -5,23 +5,24 @@ dataset:
     batch_size: 4 #8 #16
     num_workers: 1
   segment:
-    segment: 20
+    segment: 0
     sample_rate: 16000
   train:
     #csv_path: 'data/braille_train.csv'
-    #csv_path: 'data/kanji_train.csv'
-    csv_path: 'data/braille_kanji_train.csv'
+    csv_path: 'data/kanji_train.csv'
+    #csv_path: 'data/braille_kanji_train.csv'
   valid:  
     #csv_path: 'data/braille_valid.csv'
-    #csv_path: 'data/kanji_valid.csv'
-    csv_path: 'data/braille_kanji_valid.csv'
+    csv_path: 'data/kanji_valid.csv'
+    #csv_path: 'data/braille_kanji_valid.csv'
   test:
     #csv_path: 'data/braille_test.csv' #'/export/20230515/test_braille.csv'
-    #csv_path: 'data/kanji_test.csv'
-    csv_path: 'data/braille_kanji_test.csv'
+    csv_path: 'data/kanji_test.csv'
+    #csv_path: 'data/braille_kanji_test.csv'
   #tokenizer: 'data/braille_pretrained/vocab.json'
   tokenizer: 'data/kanji_pretrained/vocab.json'
-  output_tokenizer: 'data/braille_pretrained/vocab.json'
+  #output_tokenizer: 'data/braille_pretrained/vocab.json'
+  insert_space: False
   max_length: 1000
 analysis:
   sample_rate: 16000
@@ -32,32 +33,39 @@ analysis:
   global_mean_std: 'data/global_mean_std.npz'
   sort_by_len: true
 augment:
-  specaug: true
+  specaug: True
   time_mask: 80
   freq_mask: 80
 transducer:
   blank: 0
   #vocab_size: 71
   vocab_size: 2593
-  hidden_size: 256 #144 #512
+  hidden_size: 512 #256 #512 #144 #256
   num_layers: 16 #17
-  num_heads: 8 #4 #8
-  cell_size: 320 #640
+  num_heads: 8 #4 #8 #4 #8
+  cell_size: 640 #320 #640
+  dropout: 0.3
+  cntf_channels: 512
 transformer:
   blank: 0
   input_vocab_size: 2593
-  embed_size: 256
+  embed_size: 256 #512
   vocab_size: 71
   hidden_size: 256 #512
-  dim_feedforward: 1024 #2048
-  num_layers: 16 #17
-  num_heads: 4
-  cell_size: 640 #320
+  dim_feedforward: 2048 #1024
+  num_layers: 16 #16
+  num_heads: 8 #4
+  cell_size: 640 #320 #640
   upsample: 4
+  dropout: 0.3
 logger:
-  save_dir: './logs/version_10'
+  #save_dir: './logs/braille/version_5'
+  save_dir: './logs/kanji/version_2'
 model_output: 'best.pt'
 decode_output: 'decode.trn'
 max_epochs: 100
 optimizer:
   lr: 1.e-4 #4.0e-5 #1.e-4
+early_stop:
+  patience: 7
+  

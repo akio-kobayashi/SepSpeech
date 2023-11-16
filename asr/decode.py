@@ -25,12 +25,15 @@ def main():
     parser.add_argument('--config', type=str, required=True, help='config')
     parser.add_argument('--model', type=str, default=None)
     parser.add_argument('--output', type=str, default=None)
+    parser.add_argument('--greedy', action='store_true')
     
     args = parser.parse_args()
 
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
-
+    if 'config' in config.keys():
+        config = config['config']
+        
     tokenizer = ASRTokenizer(config['dataset']['tokenizer'], ctc_decode=True)
     
     use_cuda = torch.cuda.is_available()
@@ -56,8 +59,9 @@ def main():
 
     #model_dir = os.path.join(config['logger']['save_dir'], 'models')
     #path = os.path.join(model_dir, config['decode_output'])
+    beam_search=True if args.greedy is False else False
     with torch.no_grad():
-        cer = solver.decode(network, device, eval_loader, tokenizer, args.output, beam_search=True)
+        cer = solver.decode(network, device, eval_loader, tokenizer, args.output, beam_search)
 
 if __name__ == "__main__":
     

@@ -60,7 +60,7 @@ class Subsampler(nn.Module):
 
 class DownSampler(nn.Module):
     def __init__(self, output_dim):
-        super().__init__()
+        super(DownSampler, self).__init__()
         self.block1=nn.Sequential(nn.Conv2d(in_channels=1,out_channels=32,
                                     kernel_size=3, stride=1, padding=3//2,
                                     padding_mode='replicate',bias=False),
@@ -109,9 +109,10 @@ class DownSampler(nn.Module):
 '''
 #@torch.compile
 class Transducer(nn.Module):
-    def __init__(self, device, vocab_size, hidden_size=144,
+    def __init__(self, device, vocab_size, ctc_vocab_size, hidden_size=144,
                  cell_size=320, num_layers=16, num_heads=8,
-                 cntf_channels=104, dropout=.5, blank=0, bos_token=1, eos_token=2):
+                 dropout=.5, blank=0, bos_token=1, eos_token=2,
+                 ctc_weight = 1.0):
         super(Transducer, self).__init__()
         self.blank = blank
         self.bos_token = bos_token
@@ -120,9 +121,11 @@ class Transducer(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.num_heads = num_heads
-        self.cntf_channels = cntf_channels
         self.loss = RNNTLoss()
 
+        self.ctc_vocab_size = ctc_vocab_size
+        self.ctc_loss = nn.CTCLoss()
+        
         # NOTE encoder & decoder only use lstm
         # instead of RNN, just use conformer block
         layers=[]
@@ -145,7 +148,7 @@ class Transducer(nn.Module):
         self.fc0 = nn.Linear(hidden_size, cell_size) # (B, T, H)
         
         #self.downsampler=DownSampler(output_dim=hidden_size)
-        self.downsampler=CNTF(cntf_channels=cntf_channels, output_dim=hidden_size)
+        self.downsampler=CNTF(output_dim=hidden_size)
 
         self.embed = nn.Embedding(vocab_size, vocab_size-1, padding_idx=blank)
         self.embed.weight.data[1:] = torch.eye(vocab_size-1)
@@ -156,6 +159,9 @@ class Transducer(nn.Module):
         self.fc1 = nn.Linear(2*cell_size, cell_size)
         self.fc2 = nn.Linear(cell_size, vocab_size)
 
+        self.ctc_decoder = nn.Linear(cell_size, ctc_vocab_size)
+        self.ctc_weight = ctc_weight
+        
     def valid_input_lengths(self, x):
         if self.downsampler is not None:
             y = self.downsampler.valid_lengths(x)
@@ -180,12 +186,14 @@ class Transducer(nn.Module):
 
         return xs
 
-    def forward(self, xs, ys, xlen, ylen, return_loss=True):
+    def forward(self, xs, ys, zs, xlen, ylen, zlen, return_loss=True):
         if self.downsampler is not None:
             xs = self.downsampler(xs)
         xs = self.encoder(xs)
-        xs = self.fc0(xs) # (B, time//scale, hidden_size)
-
+        xs = self.fc0(xs) # (B, time//scale, cell_size)
+        
+        ctc_out = self.ctc_decoder(xs)
+        
         # concat first zero
         #zero = autograd.Variable(torch.zeros((ys.shape[0], 1)).long())
         zero = torch.zeros((ys.shape[0], 1)).long()
@@ -215,6 +223,13 @@ class Transducer(nn.Module):
             
         loss = self.loss(out, ys.int(), xlen, ylen)
 
+        # b t c -> t b c
+        ctc_out = F.log_softmax(ctc_out, dim=-1)
+        ctc_out = rearrange(ctc_out, 'b t c -> t b c')
+        _ctc_loss = self.ctc_loss(ctc_out, zs, xlen, zlen)
+
+        loss += self.ctc_weight * _ctc_loss
+        
         return loss
 
     def greedy_decode(self, x, ff=True):
