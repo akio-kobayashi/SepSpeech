@@ -3,16 +3,20 @@
 rootdir=/export1/Speech/mixture/test_b01-25/estimate
 csvdir=audio/csv/test/
 
-cofig=config.yaml
+config=tasnet/lightning_logs/version_6/hparams.yaml
 model_type=tasnet
-checkpoint=tasnet/lightning_logs/version_1/checkpoints/last.ckpt
+checkpoint=tasnet/lightning_logs/version_6/checkpoints/last.ckpt
 
 # opus encoded speech
 for snr in 60 20 10 0;
+#for snr in 0;
 do
-    for bps in 6000 12000 16000;
+    #for bps in 6000 12000 16000;
+    #for bps in 16000;
+    for bps in 6000 12000;
     do
 	for packet_loss_rate in 0.00001 0.05 0.1;
+	#for packet_loss_rate in 0.1;
 	do
 	    for gender in male female;
 	    do
@@ -41,7 +45,7 @@ do
 			    --output_csv $output_csv \
 			    --output_dir $output_dir \
 			    --model_type $model_type \
-			    --config config.yaml \
+			    --config $config \
 			    --checkpoint $checkpoint
 		    rm -f $speaker_input_csv
 		    rm -f $speaker_enroll_csv

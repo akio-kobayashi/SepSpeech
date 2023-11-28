@@ -17,19 +17,21 @@ import numpy as np
 import scipy.signal as signal
 from einops import rearrange
 
+max_lag = 250
 def align(source:Tensor, target:Tensor):
     correlation = signal.correlate(rearrange(target, 'c t -> (c t)').detach().numpy(),
     rearrange(source,'c t -> (c t)').detach().numpy(), mode='full')
     lags = signal.correlation_lags(target.shape[-1], source.shape[-1], mode='full')
     lag = lags[np.argmax(correlation)]
 
-    if lag > 0:
-        target = target[:, lag:]
-        source = source[:, :target.shape[-1]]
-    else:
-        lag = -lag
-        source = source[:, lag:]
-        target = target[:, :source.shape[-1]]
+    if lag <= max_lag:
+        if lag > 0:
+            target = target[:, lag:]
+            source = source[:, :target.shape[-1]]
+        else:
+            lag = -lag
+            source = source[:, lag:]
+            target = target[:, :source.shape[-1]]
 
     return source, target
 
@@ -45,7 +47,7 @@ def main(args):
     _stoi = ShortTimeObjectiveIntelligibility(args.sample_rate, extended=True).to(device)
     
     df_out = pd.DataFrame(index=None, 
-                          columns=['key', 'mixture', 'source', 'enroll', 'estimate', 'mix_result', 'est_result', 'mix_pesq', 'mix_stoi', 'mix_sdr', 'est_pesq', 'est_stoi', 'est_sdr'])
+                          columns=['key', 'mixture', 'source', 'estimate', 'mix_pesq', 'mix_stoi', 'est_pesq', 'est_stoi'])
     keys = []
     est_pesq, est_stoi = [], []
     mix_pesq, mix_stoi = [], []
@@ -59,7 +61,8 @@ def main(args):
             keys.append(key)
             mixtures.append(row['mixture'])
             sources.append(row['source'])
-
+            estimates.append(row['estimate'])
+            
             mixture = read_audio(row['mixture'])
             source = read_audio(row['source'])
             estimate = read_audio(row['estimate'])
@@ -69,6 +72,9 @@ def main(args):
             mix_pesq.append(_pesq(mixture.cuda(), source.cuda()).cpu().detach().numpy())
             mix_stoi.append(_stoi(mixture.cuda(), source.cuda()).cpu().detach().numpy())
 
+            source = read_audio(row['source'])
+            estimate, source = align(estimate, source)
+            
             est_pesq.append(_pesq(estimate.cuda(), source.cuda()).cpu().detach().numpy())
             est_stoi.append(_stoi(estimate.cuda(), source.cuda()).cpu().detach().numpy())
             
@@ -76,7 +82,7 @@ def main(args):
     df_out['mix_pesq'], df_out['mix_stoi'] = mix_pesq, mix_stoi
     df_out['est_pesq'], df_out['est_stoi'] = est_pesq, est_stoi
 
-    pesq, stoi, sdr = np.mean(mix_pesq), np.mean(mix_stoi)
+    pesq, stoi = np.mean(mix_pesq), np.mean(mix_stoi)
     print("mixture:  PESQ = %.4f , STOI = %.4f" % (pesq, stoi))
     
     pesq, stoi = np.mean(est_pesq), np.mean(est_stoi)

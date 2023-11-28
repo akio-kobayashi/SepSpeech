@@ -29,6 +29,8 @@ def main(args):
 
     with open(args.config, 'r') as yf:
         config = yaml.safe_load(yf)
+    if 'config' in config.keys():
+        config = config['config']
 
     config['model_type'] = args.model_type
     
