@@ -111,7 +111,7 @@ def main(args):
     S_BxD = S_BD - S_B - S_D
 
     d_CxD = d_C * d_D
-    S_CD = two_factors(df, 'snr', 'width', args.column_name) - CT
+    S_CD = two_factors(df, 'packet_loss', 'width', args.column_name) - CT
     S_CxD = S_CD - S_C - S_D
 
     # three-factors
