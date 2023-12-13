@@ -24,8 +24,11 @@ def main(args):
                     
             if method == 'degraded':
                 print(f'{parts[-1]} {parts[-5]}')
-                if (parts[-1].startswith('BF') or parts[-1].startswith('NF')) and parts[-5] == 'female': continue
-                if (parts[-1].startswith('BM') or parts[-1].startswith('NM')) and parts[-5] == 'male': continue
+                if parts[-1].startswith('BF') and parts[-5] == 'female': continue
+                if parts[-1].startswith('NF') and parts[-5] == 'female': continue
+
+                if parts[-1].startswith('BM') and parts[-5] == 'male': continue
+                if parts[-1].startswith('NM') and parts[-5] == 'male': continue
                 snr=parts[-4]
                 width=parts[-3]
                 packet_loss=parts[-2]
