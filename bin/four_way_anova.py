@@ -18,7 +18,6 @@ def F_test(v1, v2, df1, df2):
     p1 = f_frozen.sf(f_value)  # right-side
     p2 = f_frozen.cdf(f_value) # left-side
 
-    print(f'{v1} {v2}')
     p_value = min(p1, p2) * 2
 
     return f_value, p_value
@@ -184,24 +183,24 @@ def main(args):
 
     f_AxBxCxD, p_AxBxCxD = F_test(V_AxBxCxD, V_E, d_AxBxCxD, d_E)
 
-    print(f'A\t{f_A}\t{p_A}')
-    print(f'B\t{f_B}\t{p_B}')
-    print(f'C\t{f_C}\t{p_C}')
-    print(f'D\t{f_D}\t{p_D}')
+    print(f'A\t{f_A:.4f}\t{p_A:.4f}')
+    print(f'B\t{f_B:.4f}\t{p_B:.4f}')
+    print(f'C\t{f_C:.4f}\t{p_C:.4f}')
+    print(f'D\t{f_D:.4f}\t{p_D:.4f}')
 
-    print(f'AxB\t{f_AxB}\t{p_AxB}')
-    print(f'AxC\t{f_AxC}\t{p_AxC}')
-    print(f'AxD\t{f_AxD}\t{p_AxD}')
-    print(f'BxC\t{f_BxC}\t{p_BxC}')
-    print(f'BxD\t{f_BxD}\t{p_BxD}')
-    print(f'CxD\t{f_CxD}\t{p_CxD}')
+    print(f'AxB\t{f_AxB:.4f}\t{p_AxB:.4f}')
+    print(f'AxC\t{f_AxC:.4f}\t{p_AxC:.4f}')
+    print(f'AxD\t{f_AxD:.4f}\t{p_AxD:.4f}')
+    print(f'BxC\t{f_BxC:.4f}\t{p_BxC:.4f}')
+    print(f'BxD\t{f_BxD:.4f}\t{p_BxD:.4f}')
+    print(f'CxD\t{f_CxD:.4f}\t{p_CxD:.4f}')
 
-    print(f'AxBxC\t{f_AxBxC}\t{p_AxBxC}')
-    print(f'AxBxD\t{f_AxBxD}\t{p_AxBxD}')
-    print(f'AxCxD\t{f_AxCxD}\t{p_AxCxD}')
-    print(f'BxCxD\t{f_BxCxD}\t{p_BxCxD}')
+    print(f'AxBxC\t{f_AxBxC:.4f}\t{p_AxBxC:.4f}')
+    print(f'AxBxD\t{f_AxBxD:.4f}\t{p_AxBxD:.4f}')
+    print(f'AxCxD\t{f_AxCxD:.4f}\t{p_AxCxD:.4f}')
+    print(f'BxCxD\t{f_BxCxD:.4f}\t{p_BxCxD:.4f}')
 
-    print(f'AxBxCxD\t{f_AxBxCxD}\t{p_AxBxCxD}')
+print(f'AxBxCxD\t{f_AxBxCxD:.4f}\t{p_AxBxCxD:.4f}')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
