@@ -23,18 +23,20 @@ def main(args):
             parts = row['filename'].split('/')
                     
             if method == 'degraded':
-                print(f'{parts[-1]} {parts[-5]}')
                 if ('BF' in parts[-1] or 'NF' in parts[-1]) and (parts[-5] == 'female'): 
                     continue
                 if ('BM' in parts[-1] or 'NM' in parts[-1]) and (parts[-5] == 'male'): 
                     continue  
+                print(f'{parts[-1]} {parts[-5]}')
 
                 snr=parts[-4]
                 width=parts[-3]
                 packet_loss=parts[-2]
             else:
-                if ('BF' in parts[-1] or 'NF' in parts[-1]) and parts[-3] == 'female': continue
-                if ('BM' in parts[-1] or 'NM' in parts[-1]) and parts[-3] == 'male': continue                
+                if ('BF' in parts[-1] or 'NF' in parts[-1]) and parts[-3] == 'female':
+                    continue
+                if ('BM' in parts[-1] or 'NM' in parts[-1]) and parts[-3] == 'male': 
+                    continue   
                 snr=parts[-6]
                 width=parts[-5]
                 packet_loss=[-4]
