@@ -4,7 +4,7 @@ import os, sys
 
 def main(args):
     d_method, d_snr, d_width, d_packet_loss, =[], [], [], []
-    d_raw_SIG, d_raw_BAK, d_raw_OVRL = [], [], []
+    d_SIG_raw, d_BAK_raw, d_OVRL_raw = [], [], []
 
     for csv in args.input_csv:
         if csv.startswith('mixture'):
@@ -38,42 +38,48 @@ def main(args):
                     continue   
                 snr=parts[-6]
                 width=parts[-5]
-                packet_loss=[-4]
-
-            if snr != '0' or snr != '10' or snr != '20' or snr != '60':
+                packet_loss=parts[-4]
+                
+            if snr == '5':
                 continue
-            if snr == '60': snr='inf'                
+            #if snr == '60':
+            #    snr='inf'                
             
-            if width == '16000': width='8kHz'
-            elif width == '12000': width='6kHz'
-            elif width == '6000': width='4kHz'
+            if width == '16000':
+                width='8kHz'
+            elif width == '12000':
+                width='6kHz'
+            elif width == '6000':
+                width='4kHz'
             else:
                 raise ValueError('wrong band width')
             
-            if packet_loss == '0.00001': packet_loss='0%'
-            elif packet_loss == '0.05': packet_loss='5%'
-            elif packet_loss == '0.1': packet_loss='10%'
+            if packet_loss == '0.00001':
+                packet_loss='0%'
+            elif packet_loss == '0.05':
+                packet_loss='5%'
+            elif packet_loss == '0.1':
+                packet_loss='10%'
             else:
                 raise ValueError('wrong packet loss')
             
-            print(method)
             d_method.append(method)
             d_snr.append(snr)
             d_width.append(width)
             d_packet_loss.append(packet_loss)
 
-            d_raw_SIG.append(row['raw_SIG'])
-            d_raw_BAK.append(row['raw_BAK'])
-            d_raw_OVRL.append(row['raw_OVRL'])
+            d_SIG_raw.append(row['SIG_raw'])
+            d_BAK_raw.append(row['BAK_raw'])
+            d_OVRL_raw.append(row['OVRL_raw'])
     
     df_new = pd.DataFrame()
     df_new['method'] = d_method
     df_new['snr'] = d_snr
     df_new['width'] = d_width
     df_new['packet_loss'] = d_packet_loss
-    df_new['raw_SIG'] = d_raw_SIG
-    df_new['raw_BAK'] = d_raw_BAK
-    df_new['raw_OVRL'] = d_raw_OVRL
+    df_new['SIG_raw'] = d_SIG_raw
+    df_new['BAK_raw'] = d_BAK_raw
+    df_new['OVRL_raw'] = d_OVRL_raw
 
     df_new.to_csv(args.output_csv, index=False)
 

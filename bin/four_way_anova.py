@@ -6,9 +6,9 @@ import os, sys
 
 factors={
     'method': {'degraded', 'speaker_beam', 'e3net', 'clean_unet'},
-    'snr': {'inf', '20', '10', '0'},
+    'snr': {'60', '20', '10', '0'},
     'packet_loss': {'0%', '5%', '10%'},
-    'band': {'8kHz', '6kHz', '4kHz'}
+    'width': {'8kHz', '6kHz', '4kHz'}
 }
 
 def F_test(v1, v2, df1, df2):
@@ -18,6 +18,7 @@ def F_test(v1, v2, df1, df2):
     p1 = f_frozen.sf(f_value)  # right-side
     p2 = f_frozen.cdf(f_value) # left-side
 
+    print(f'{v1} {v2}')
     p_value = min(p1, p2) * 2
 
     return f_value, p_value
@@ -25,7 +26,7 @@ def F_test(v1, v2, df1, df2):
 def one_factor(df, factor, col_name):
     val = 0.
     for f0 in factors[factor]:
-        query = factor + '=@' + f0
+        query = factor+'==@f0'
         temp = df.query(query)
         val += np.square(temp[col_name].sum()) / len(temp)
     return val
@@ -33,42 +34,42 @@ def one_factor(df, factor, col_name):
 def two_factors(df, factor1, factor2, col_name):
     val = 0.
     for f1 in factors[factor1]:
-        query1 = factor1 + '=@' + f1
+        query1 = factor1 + '==@f1'
         for f2 in factors[factor2]:
-            query2 = factor2 + '=@' + f2
-            temp = df.query(query1) & df.query(query2)
+            query2 = query1 + ' & ' + factor2 + '==@f2'
+            temp = df.query(query2)
             val += np.square(temp[col_name].sum()) / len(temp)
     return val
 
 def three_factors(df, factor1, factor2, factor3, col_name):
     val = 0.
     for f1 in factors[factor1]:
-        query1 = factor1 + '=@' + f1
+        query1 = factor1 + '==@f1'
         for f2 in factors[factor2]:
-            query2 = factor2 + '=@' + f2
+            query2 = factor2 + '==@f2'
             for f3 in factors[factor3]:
-                query3 = factor3 + '=@' + f3
-                temp = df.query(query1) & df.query(query2) & df.query(query3)
+                query3 = query1 + ' & ' + query2 + ' & ' + factor3 + '==@f3'
+                temp = df.query(query3)
                 val += np.square(temp[col_name].sum()) / len(temp)
     return val
 
 def four_factors(df, factor1, factor2, factor3, factor4, col_name):
     val = 0.
     for f1 in factors[factor1]:
-        query1 = factor1 + '=@' + f1
+        query1 = factor1 + '==@f1'
         for f2 in factors[factor2]:
-            query2 = factor2 + '=@' + f2
+            query2 = factor2 + '==@f2'
             for f3 in factors[factor3]:
-                query3 = factor3 + '=@' + f3
+                query3 = factor3 + '==@f3'
                 for f4 in factors[factor4]:
-                    query4 = factor4 + '=@' + f4
-                    temp = df.query(query1) & df.query(query2) & df.query(query3) & df.query(query4)
+                    query4 = query1 + ' & ' + query2 + ' & ' + query3 + ' & ' + factor4 + '==@f4'
+                    temp = df.query(query4)
                     val += np.square(temp[col_name].sum()) / len(temp)
     return val
 
 def main(args):
     df = pd.read_csv(args.input_csv)
-
+    df['snr'] = df['snr'].astype(str)
     # modified term
     CT = np.square(df[args.column_name].sum()) / len(df)
 
@@ -86,53 +87,53 @@ def main(args):
     S_C = one_factor(df, 'packet_loss', args.column_name) - CT
 
     d_D = 2
-    S_D = one_factor(df, 'band', args.column_name) - CT
-
+    S_D = one_factor(df, 'width', args.column_name) - CT
+    
     # two-factors
     d_AxB = d_A * d_B
-    S_AB = two_factors(df, 'method', 'snr', args.col_name) - CT
+    S_AB = two_factors(df, 'method', 'snr', args.column_name) - CT
     S_AxB = S_AB - S_A - S_B
 
     d_AxC = d_A * d_C
-    S_AC = two_factors(df, 'method', 'packet_loss', args.col_name) - CT
+    S_AC = two_factors(df, 'method', 'packet_loss', args.column_name) - CT
     S_AxC = S_AC - S_A - S_C
 
     d_AxD = d_A * d_D
-    S_AD = two_factors(df, 'method', 'band', args.col_name) - CT
+    S_AD = two_factors(df, 'method', 'width', args.column_name) - CT
     S_AxD = S_AD - S_A - S_D
 
     d_BxC = d_B * d_C
-    S_BC = two_factors(df, 'snr', 'packet_loss', args.col_name) - CT
+    S_BC = two_factors(df, 'snr', 'packet_loss', args.column_name) - CT
     S_BxC = S_BC - S_B - S_C
 
     d_BxD = d_B * d_D
-    S_BD = two_factors(df, 'snr', 'band', args.col_name) - CT
+    S_BD = two_factors(df, 'snr', 'width', args.column_name) - CT
     S_BxD = S_BD - S_B - S_D
 
     d_CxD = d_C * d_D
-    S_CD = two_factors(df, 'snr', 'band', args.col_name) - CT
+    S_CD = two_factors(df, 'snr', 'width', args.column_name) - CT
     S_CxD = S_CD - S_C - S_D
 
     # three-factors
     d_AxBxC = d_A * d_B * d_C
-    S_ABC = three_factors(df, 'method', 'snr', 'packet_loss', args.col_name) - CT
+    S_ABC = three_factors(df, 'method', 'snr', 'packet_loss', args.column_name) - CT
     S_AxBxC = S_ABC - S_A - S_B - S_C - S_AxB - S_AxC - S_BxC
 
     d_AxBxD = d_A * d_B * d_D
-    S_ABD = three_factors(df, 'method', 'snr', 'band', args.col_name) - CT
+    S_ABD = three_factors(df, 'method', 'snr', 'width', args.column_name) - CT
     S_AxBxD = S_ABD - S_A - S_B - S_D - S_AxB - S_AxD - S_BxD
 
     d_AxCxD = d_A * d_C * d_D
-    S_ACD = three_factors(df, 'method', 'packet_loss', 'band', args.col_name) - CT
+    S_ACD = three_factors(df, 'method', 'packet_loss', 'width', args.column_name) - CT
     S_AxCxD = S_ACD - S_A - S_C - S_D - S_AxC - S_AxD - S_CxD
 
     d_BxCxD = d_B * d_C * d_D
-    S_BCD = three_factors(df, 'snr', 'packet_loss', 'band', args.col_name) - CT
+    S_BCD = three_factors(df, 'snr', 'packet_loss', 'width', args.column_name) - CT
     S_BxCxD = S_BCD - S_B - S_C - S_D - S_BxC - S_BxD - S_CxD
 
     # four-factors
     d_AxBxCxD = d_A * d_B * d_C * d_D
-    S_ABCD = four_factors(df, 'method', 'snr', 'packet_loss', 'band', args.col_name) - CT
+    S_ABCD = four_factors(df, 'method', 'snr', 'packet_loss', 'width', args.column_name) - CT
     S_AxBxCxD = S_ABCD - S_A - S_B - S_C - S_D - S_AxB - S_AxC - S_AxD - S_BxC - S_BxD - S_CxD - S_AxBxC - S_AxBxD - S_AxCxD - S_BxCxD
 
     abcd=4*4*3*3
@@ -204,7 +205,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_csv', nargs='*',)
+    parser.add_argument('--input_csv', type=str, required=True)
     parser.add_argument('--column_name', type=str, required=True)
     args=parser.parse_args()
 
