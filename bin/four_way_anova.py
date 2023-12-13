@@ -200,7 +200,7 @@ def main(args):
     print(f'AxCxD\t{f_AxCxD:.4f}\t{p_AxCxD:.4f}')
     print(f'BxCxD\t{f_BxCxD:.4f}\t{p_BxCxD:.4f}')
 
-print(f'AxBxCxD\t{f_AxBxCxD:.4f}\t{p_AxBxCxD:.4f}')
+    print(f'AxBxCxD\t{f_AxBxCxD:.4f}\t{p_AxBxCxD:.4f}')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
