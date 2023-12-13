@@ -23,7 +23,7 @@ def main(args):
             parts = row['filename'].split('/')
                     
             if method == 'degraded':
-                print(f'parts[-1] parts[-5]')
+                print(f'{parts[-1]} {parts[-5]}')
                 if (parts[-1].startswith('BF') or parts[-1].startswith('NF')) and parts[-5] == 'female': continue
                 if (parts[-1].startswith('BM') or parts[-1].startswith('NM')) and parts[-5] == 'male': continue
                 snr=parts[-4]
