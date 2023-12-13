@@ -23,12 +23,11 @@ def main(args):
             parts = row['filename'].split('/')
                     
             if method == 'degraded':
-                if ('BF' in parts[-1] or 'NF' in parts[-1]):
-                    if parts[-5] == 'female':
-                        continue
                 print(f'{parts[-1]} {parts[-5]}')
-                if ('BF' in parts[-1] or 'NF' in parts[-1]) and (parts[-5] == 'female'): continue
-                if ('BM' in parts[-1] or 'NM' in parts[-1]) and (parts[-5] == 'male'): continue  
+                if ('BF' in parts[-1] or 'NF' in parts[-1]) and (parts[-5] == 'female'): 
+                    continue
+                if ('BM' in parts[-1] or 'NM' in parts[-1]) and (parts[-5] == 'male'): 
+                    continue  
 
                 snr=parts[-4]
                 width=parts[-3]
