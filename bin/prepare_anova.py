@@ -50,6 +50,7 @@ def main(args):
             else:
                 raise ValueError('wrong packet loss')
             
+            print(method)
             d_method.append(method)
             d_snr.append(snr)
             d_width.append(width)
