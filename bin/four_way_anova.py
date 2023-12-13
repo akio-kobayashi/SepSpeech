@@ -74,7 +74,7 @@ def main(args):
     CT = np.square(df[args.column_name].sum()) / len(df)
 
     # total square sum
-    S_T = (df[args.column_name]**2).sum()/len(df) - CT
+    S_T = (df[args.column_name]**2).sum() - CT
 
     # factors
     d_A = 3
