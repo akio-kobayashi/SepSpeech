@@ -15,8 +15,10 @@ def main(args):
     df[args.hue_name] = df[args.hue_name].astype(str)
 
     fig, ax = plt.subplots(1, 1, dpi=300)
-    ax = sns.scatterplot(data=df, x='objective', y='hasqi', hue=args.hue_name)
-
+    ax.set_xlim([1,4.5])
+    ax.set_ylim([0,1])
+    ax = sns.scatterplot(data=df, x='objective', y='hasqi', hue=args.hue_name, palette='gist_earth')
+    
     for snr in [0, 20]:
         snr=str(snr)
         model = LinearRegression()
@@ -26,8 +28,9 @@ def main(args):
         df_y = pd.DataFrame(temp['hasqi'])
         model_lin = model.fit(df_x, df_y)
         y_fit = model_lin.predict(df_x)
-        #r2_lin = model.score(df_x, df_y)
-        plt.plot(df_x.values, y_fit, color="#000000", linewidth=0.5)
+        r2_lin = model.score(df_x, df_y)
+        print(r2_lin)
+        plt.plot(df_x.values, y_fit, color="#000000", linewidth=1.0 )
         
     ax.set_xlabel('DNSMOS (OVRL_raw)')
     ax.set_ylabel('HASQI')
