@@ -18,7 +18,8 @@ def main(args):
     ax.set_xlim([1,4.5])
     ax.set_ylim([0,1])
     ax = sns.scatterplot(data=df, x='objective', y='hasqi', hue=args.hue_name, palette='gist_earth')
-    
+
+    r2_lins=[]    
     for snr in [0, 20]:
         snr=str(snr)
         model = LinearRegression()
@@ -29,8 +30,11 @@ def main(args):
         model_lin = model.fit(df_x, df_y)
         y_fit = model_lin.predict(df_x)
         r2_lin = model.score(df_x, df_y)
-        print(r2_lin)
+        r2_lins.apend(r2_lin)
         plt.plot(df_x.values, y_fit, color="#000000", linewidth=1.0 )
+    
+    ax.text(19.0, 0.6, '$R^{2}$='+str(round(r2_lins[0], 4)))
+    ax.text(21.0, 1.0, '$R^{2}$='+str(round(r2_lins[1], 4)))
         
     ax.set_xlabel('DNSMOS (OVRL_raw)')
     ax.set_ylabel('HASQI')
