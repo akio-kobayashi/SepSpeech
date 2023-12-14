@@ -18,15 +18,16 @@ def main(args):
     ax = sns.scatterplot(data=df, x='objective', y='hasqi', hue=args.hue_name)
 
     for snr in [0, 20]:
+        snr=str(snr)
         model = LinearRegression()
-        query = args.hue_name + '==@' + str(snr)
-        temp = pd.query(query)
-        df_x = temp['objective']
-        df_y = temp['hasqi']
+        query = args.hue_name + '==@snr'
+        temp = df.query(query)
+        df_x = pd.DataFrame(temp['objective'])
+        df_y = pd.DataFrame(temp['hasqi'])
         model_lin = model.fit(df_x, df_y)
         y_fit = model_lin.predict(df_x)
         #r2_lin = model.score(df_x, df_y)
-        plt.plot(df_x, y_fit, color="#000000", linewidth=0.5)
+        plt.plot(df_x.values, y_fit, color="#000000", linewidth=0.5)
         
     ax.set_xlabel('DNSMOS (OVRL_raw)')
     ax.set_ylabel('HASQI')
