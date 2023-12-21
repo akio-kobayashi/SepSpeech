@@ -16,5 +16,6 @@ if __name__=='__main__':
             df_temp = pd.read_csv(csv_path)
             df_merge = pd.concat([df_merge, df_temp])
 
+    #df_merge.drop('Unnamed 0:', inplace=True)
     df_merge.to_csv(args.output_csv, index=False)
 

@@ -84,8 +84,11 @@ def align(source:Tensor, target:Tensor):
 
     return source, target
 
-def read_audio(path):
+def read_audio(path, normalize=True):
     wave, sr = torchaudio.load(path)
+    if normalize:
+        rms = torch.sqrt(torch.sum(torch.square(wave))/wave.shape[-1])
+        wave /= rms
     #std, mean = torch.std_mean(wave)
     #wave = wave - mean
     #print(torch.max(wave))

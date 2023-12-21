@@ -63,8 +63,11 @@ class HASQI:
                                   self.level1)
         return score
 
-def read_audio(path):
+def read_audio(path, normalize=True):
     wave, sr = torchaudio.load(path)
+    if normalize:
+        rms = torch.sqrt(torch.sum(torch.square(wave))/wave.shape[-1])
+        wave /= rms
     return rearrange(wave, 'c t -> (c t)').to('cpu').numpy()
 
 class HearingAid:

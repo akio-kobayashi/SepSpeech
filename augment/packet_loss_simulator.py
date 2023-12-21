@@ -25,7 +25,7 @@ class GilbertElliotModel:
         p_beta = (1.-lmd) * (p_b - plr)/(p_b - p_g)
         #print(f'P_beta  = {p_beta:.3f}')
         
-        assert p_alpha > 0 and p_beta > 0
+        assert p_alpha >= 0 and p_beta >= 0
 
         self.states = {}
         self.states[StateType.Good] = State(StateType.Good, p_alpha)
