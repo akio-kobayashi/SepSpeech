@@ -231,7 +231,7 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     block = ConformerBlock(dim=256).to(device)
-    inputs = torch.tensor([8, 256, 1024], device=device)
+    inputs = torch.randn(8, 256, 1024).to(device)
     print(inputs.shape)
     outputs = block(inputs)
     print(outputs.shape)
