@@ -188,7 +188,9 @@ class ConformerBlock(nn.Module):
         x = self.attn(x, mask = mask) + x
         x = self.conv(x) + x
         x = self.ff2(x) + x
+        x = rearrange(x, 'b c t -> b t c')
         x = self.post_norm(x)
+        x = rearrange(x, 'b t c -> b c t')
         return x
 
 class LearnableEncoder(nn.Module):
