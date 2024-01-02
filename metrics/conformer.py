@@ -44,7 +44,8 @@ class GLU(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        out, gate = x.chunk(2, dim=1)
+        # x.shape = (b c t)
+        out, gate = torch.chunk(x, 2, dim=1)
         return out * gate.sigmoid()
     
 class Swish(nn.Module):
@@ -144,7 +145,7 @@ class ConformerConvModule(nn.Module):
             nn.LayerNorm(dim_model),
             Rearrange('b t c -> b c t'),
             nn.Conv1d(dim_model, inner_dim * 2, 1),
-            GLU(dim=1),
+            GLU(),
             DepthWiseConv1d(inner_dim, inner_dim, kernel_size = kernel_size, padding = padding),
             nn.BatchNorm1d(inner_dim) if not causal else nn.Identity(),
             Swish(),
