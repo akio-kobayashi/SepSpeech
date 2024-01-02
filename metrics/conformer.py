@@ -125,6 +125,7 @@ class FeedForward(nn.Module):
         )
 
     def forward(self, x):
+        print("input")
         print(x.shape)
         return self.net(x)
 
