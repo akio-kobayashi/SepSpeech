@@ -114,8 +114,6 @@ class FeedForward(nn.Module):
         dropout = 0.
     ):
         super().__init__()
-        print(dim_model)
-        '''
         self.net = nn.Sequential(
             Rearrange('b c t -> b t c'),
             nn.Linear(dim_model, dim_model * mult),
@@ -125,16 +123,10 @@ class FeedForward(nn.Module):
             Rearrange('b t c -> b c t'),
             nn.Dropout(dropout)
         )
-        '''
         self.ff1 = nn.Linear(dim_model, dim_model*mult)
-        print(self.ff1.weight.shape)
+
     def forward(self, x):
-        print(x.shape)
-        print("input")
         x = rearrange(x, 'b c t -> b t c')
-        print(x.shape)
-        x = self.ff1(x)
-        exit(0)
         return self.net(x)
 
 class ConformerConvModule(nn.Module):
@@ -197,7 +189,6 @@ class ConformerBlock(nn.Module):
         self.post_norm = nn.LayerNorm(dim)
 
     def forward(self, x, mask = None):
-        print(x.shape)
         x = 0.5*(self.ff1(self.norm1(x))) + x
         x = self.attn(self.norm2(x), mask = mask) + x
         x = self.conv(x) + x
@@ -245,6 +236,4 @@ if __name__ == '__main__':
 
     block = ConformerBlock(dim=256).to(device)
     inputs = torch.randn(8, 256, 1024).to(device)
-    print(inputs.shape)
     outputs = block(inputs)
-    print(outputs.shape)
