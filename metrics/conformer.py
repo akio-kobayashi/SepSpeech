@@ -181,24 +181,27 @@ class ConformerBlock(nn.Module):
         conv_dropout = 0.
     ):
         super().__init__()
+        self.norm1 = Norm(dim)
         self.ff1 = FeedForward(dim_model = dim, mult = ff_mult, dropout = ff_dropout)
         #self.attn = Attention(dim = dim, dim_head = dim_head, heads = heads, dropout = attn_dropout)
+        self.norm2 = Norm(dim)
         self.attn = LinearAttention(dim_model = dim, heads = heads, dim_head=dim_head)
         self.conv = ConformerConvModule(dim_model = dim, causal = False, expansion_factor = conv_expansion_factor, kernel_size = conv_kernel_size, dropout = conv_dropout)
+        self.norm3 = Norm(dim)
         self.ff2 = FeedForward(dim_model = dim, mult = ff_mult, dropout = ff_dropout)
 
-        self.attn = PreNorm(dim, self.attn)
-        self.ff1 = Scale(0.5, PreNorm(dim, self.ff1))
-        self.ff2 = Scale(0.5, PreNorm(dim, self.ff2))
+        #self.attn = PreNorm(dim, self.attn)
+        #self.ff1 = Scale(0.5, PreNorm(dim, self.ff1))
+        #self.ff2 = Scale(0.5, PreNorm(dim, self.ff2))
 
         self.post_norm = nn.LayerNorm(dim)
 
     def forward(self, x, mask = None):
         print(x.shape)
-        x = self.ff1(x) + x
-        x = self.attn(x, mask = mask) + x
+        x = 0.5*(self.ff1(self.norm1(x))) + x
+        x = self.attn(self.norm2(x), mask = mask) + x
         x = self.conv(x) + x
-        x = self.ff2(x) + x
+        x = 0.5*self.ff2(self.norm3(x)) + x
         x = rearrange(x, 'b c t -> b t c')
         x = self.post_norm(x)
         x = rearrange(x, 'b t c -> b c t')
