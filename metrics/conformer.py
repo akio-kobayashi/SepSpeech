@@ -129,6 +129,7 @@ class FeedForward(nn.Module):
         self.ff1 = nn.Linear(dim_model, dim_model*mult)
         print(self.ff1.weight.shape)
     def forward(self, x):
+        print(x.shape)
         print("input")
         x = rearrange(x, 'b c t -> b t c')
         print(x.shape)
