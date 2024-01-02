@@ -186,6 +186,7 @@ class ConformerBlock(nn.Module):
         self.post_norm = nn.LayerNorm(dim)
 
     def forward(self, x, mask = None):
+        print(x.shape)
         x = self.ff1(x) + x
         x = self.attn(x, mask = mask) + x
         x = self.conv(x) + x
