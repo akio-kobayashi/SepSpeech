@@ -115,6 +115,7 @@ class FeedForward(nn.Module):
     ):
         super().__init__()
         print(dim_model)
+        '''
         self.net = nn.Sequential(
             Rearrange('b c t -> b t c'),
             nn.Linear(dim_model, dim_model * mult),
@@ -124,10 +125,15 @@ class FeedForward(nn.Module):
             Rearrange('b t c -> b c t'),
             nn.Dropout(dropout)
         )
+        '''
+        self.ff1 = nn.Linear(dim_model, dim_model*mult)
 
     def forward(self, x):
         print("input")
         print(x.shape)
+        x = rearrange(x, 'b c t -> b t c')
+        x = self.ff1(x)
+        exit(0)
         return self.net(x)
 
 class ConformerConvModule(nn.Module):
