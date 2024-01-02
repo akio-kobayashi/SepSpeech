@@ -130,8 +130,8 @@ class FeedForward(nn.Module):
         print(self.ff1.weight.shape)
     def forward(self, x):
         print("input")
-        print(x.shape)
         x = rearrange(x, 'b c t -> b t c')
+        print(x.shape)
         x = self.ff1(x)
         exit(0)
         return self.net(x)
