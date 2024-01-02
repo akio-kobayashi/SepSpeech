@@ -125,6 +125,7 @@ class FeedForward(nn.Module):
         )
 
     def forward(self, x):
+        print(x.shape)
         return self.net(x)
 
 class ConformerConvModule(nn.Module):
@@ -231,5 +232,6 @@ if __name__ == '__main__':
 
     block = ConformerBlock(dim=256).to(device)
     inputs = torch.tensor([8, 256, 1024], device=device)
+    print(inputs.shape)
     outputs = block(inputs)
     print(outputs.shape)
