@@ -114,6 +114,7 @@ class FeedForward(nn.Module):
         dropout = 0.
     ):
         super().__init__()
+        print(dim_model)
         self.net = nn.Sequential(
             Rearrange('b c t -> b t c'),
             nn.Linear(dim_model, dim_model * mult),
