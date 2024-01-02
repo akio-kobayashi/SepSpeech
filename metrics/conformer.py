@@ -170,11 +170,11 @@ class ConformerBlock(nn.Module):
         conv_dropout = 0.
     ):
         super().__init__()
-        self.ff1 = FeedForward(dim = dim, mult = ff_mult, dropout = ff_dropout)
+        self.ff1 = FeedForward(dim_model = dim, mult = ff_mult, dropout = ff_dropout)
         #self.attn = Attention(dim = dim, dim_head = dim_head, heads = heads, dropout = attn_dropout)
         self.attn = LinearAttention(dim_model = dim, heads = heads, dim_head=dim_head)
-        self.conv = ConformerConvModule(dim = dim, causal = False, expansion_factor = conv_expansion_factor, kernel_size = conv_kernel_size, dropout = conv_dropout)
-        self.ff2 = FeedForward(dim = dim, mult = ff_mult, dropout = ff_dropout)
+        self.conv = ConformerConvModule(dim_model = dim, causal = False, expansion_factor = conv_expansion_factor, kernel_size = conv_kernel_size, dropout = conv_dropout)
+        self.ff2 = FeedForward(dim_model = dim, mult = ff_mult, dropout = ff_dropout)
 
         self.attn = PreNorm(dim, self.attn)
         self.ff1 = Scale(0.5, PreNorm(dim, self.ff1))
