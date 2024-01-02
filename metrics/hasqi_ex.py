@@ -165,9 +165,9 @@ def hasqi_v2(
 
     # Raw data
     raw = [average_cepstral_correlation, basilar_membrane_sync5, d_loud, d_slope]
-    print(reference_db.shape)
-    print(reference_basilar_membrane.shape)
-    print(reference_sl.shape)
+    #print(reference_db.shape)
+    #print(reference_basilar_membrane.shape)
+    #print(reference_sl.shape)
     return combined, non_linear, linear, raw, [reference_db, reference_basilar_membrane, reference_sl, processed_db, processed_basilar_membrane, processed_sl]
 
 def hasqi_v2_better_ear(
