@@ -123,10 +123,8 @@ class FeedForward(nn.Module):
             Rearrange('b t c -> b c t'),
             nn.Dropout(dropout)
         )
-        self.ff1 = nn.Linear(dim_model, dim_model*mult)
 
     def forward(self, x):
-        x = rearrange(x, 'b c t -> b t c')
         return self.net(x)
 
 class ConformerConvModule(nn.Module):
