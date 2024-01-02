@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-import torch.functional.nn as nn
-import torch.functional as F
+import torch.nn as nn
+import torch.nn.functional as F
 from einops import rearrange
 
 def calc_same_padding(kernel_size):
