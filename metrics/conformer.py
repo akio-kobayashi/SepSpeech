@@ -238,3 +238,6 @@ if __name__ == '__main__':
     block = ConformerBlock(dim=256).to(device)
     inputs = torch.randn(8, 256, 1024).to(device)
     outputs = block(inputs)
+    print(inputs.shape)
+    print(outputs.shape)
+    
