@@ -179,11 +179,11 @@ def main(args):
             non_linear.append(nl)
             linear.append(lin)
             src_emb, src_bm, src_sl, tgt_emb, tgt_bm, tgt_sl = features
-            print(target.shape)
-            print(tgt_emb.shape)
-            print(tgt_bm.shape)
-            print(tgt_sl.shape)
-            
+            #print(target.shape)
+            #print(tgt_emb.shape)
+            #print(tgt_bm.shape)
+            #print(tgt_sl.shape)
+
             path = os.path.join(os.path.dirname(row[args.target_key]), key) + '_source.npz'
             #np.savez(path, src_emb, src_bm, src_sl)
             src_feats.append(path)
