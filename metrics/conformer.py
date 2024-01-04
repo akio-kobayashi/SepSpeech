@@ -71,7 +71,7 @@ class DepthWiseConv1d(nn.Module):
     def __init__(self, chan_in, chan_out, kernel_size, padding):
         super().__init__()
         #self.padding = padding
-        self.conv = nn.Conv1d(chan_in, chan_out, kernel_size, padding=padding, groups = chan_in)
+        self.conv = nn.Conv1d(chan_in, chan_out, kernel_size, padding='same', groups = chan_in)
 
     def forward(self, x):
         #x = F.pad(x, self.padding)
@@ -149,7 +149,7 @@ class ConformerConvModule(nn.Module):
             Rearrange('b t c -> b c t'),
             nn.Conv1d(dim_model, inner_dim * 2, 1),
             GLU(),
-            DepthWiseConv1d(inner_dim, inner_dim, kernel_size = kernel_size, padding = padding),
+            DepthWiseConv1d(inner_dim, inner_dim, kernel_size = kernel_size, padding = 'same'),
             nn.BatchNorm1d(inner_dim) if not causal else nn.Identity(),
             Swish(),
             nn.Conv1d(inner_dim, dim_model, 1),
@@ -202,8 +202,8 @@ class ConformerBlock(nn.Module):
 class LearnableEncoder(nn.Module):
     def __init__(self, chin=1, chout=256, kernel_size=3, stride=1):
         super().__init__()
-        padding = calc_same_padding(kernel_size)
-        self.encoder = nn.Conv1d(chin, chout, kernel_size, stride, padding)
+        #padding = calc_same_padding(kernel_size)
+        self.encoder = nn.Conv1d(chin, chout, kernel_size, stride, padding='same')
     
     def forward(self, x):
         # x.shape = (b t)
@@ -215,8 +215,8 @@ class LearnableEncoder(nn.Module):
 class LearnableDecoder(nn.Module):
     def __init__(self, chin=256, chout=32, kernel_size=121, stride=1):
         super().__init__()
-        padding = calc_same_padding(kernel_size)
-        self.decoder = nn.Conv1d(chin, chout, kernel_size, stride, padding)
+        #padding = calc_same_padding(kernel_size)
+        self.decoder = nn.Conv1d(chin, chout, kernel_size, stride, padding='same')
     
     def forward(self, x):
         # x.shape = (b c t)
