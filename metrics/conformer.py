@@ -27,11 +27,14 @@ class LinearAttention(nn.Module):
         )
 
         # mask.shape = (b t)
-        mask = torch.where(mask == True, 0.0, 1.e-12)
-        mask = rearrange(mask, 'b t -> b h c t', h=1, c=1)
+        if mask is not None:
+            mask = torch.where(mask == True, 0.0, 1.e-12)
+            mask = rearrange(mask, 'b t -> b h c t', h=1, c=1)
         q = q.softmax(dim=-2) # channel direction
-        k = (k+mask).softmax(dim=-1) # temoral direction
-
+        if mask is not None:
+            k = (k+mask).softmax(dim=-1) # temoral direction
+        else:
+            k = k.softmax(dim=-1)
         q = q * self.scale
         context = torch.einsum("b h d n, b h e n -> b h d e", k, v) # (b h c c)
 
