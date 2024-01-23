@@ -8,6 +8,8 @@ from einops import rearrange
 #from loss.plcpa import complex_stft
 import numpy as np
 
+from loss.stft_loss import SpectralConvergengeLoss, LogSTFTMagnitudeLoss
+
 def unwrap(phi, dim=-1):
     #assert dim is -1
     dphi = diff(phi, same_size=True)
@@ -52,7 +54,7 @@ def complex_cepstrum(x,
 
 
 class CepstrumLoss(nn.Module):
-    def __init__(self, n_fft=512, hop_length=160, win_length=512):
+    def __init__(self, n_fft=512, hop_length=160, win_length=512, factor_sc=0.1, factor_mag=0.1):
         super().__init__()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.loss = nn.L1Loss(reduction='sum')
@@ -60,18 +62,30 @@ class CepstrumLoss(nn.Module):
         self.hop_length = hop_length
         self.win_length = win_length       
         self.window = torch.hann_window(win_length, device=device)
-        
+        self.factor_sc = factor_sc
+        self.factor_mag = factor_mag
+        self.sc_loss = SpectralConvergengeLoss()
+        self.mag_loss = LogSTFTMagnitudeLoss()
+
     def forward(self, preds, targets, lengths):
         # (b, t) -> (b f t)
         preds = complex_cepstrum(preds, self.n_fft, self.hop_length, self.win_length, self.window)[0]
         targets = complex_cepstrum(targets, self.n_fft, self.hop_length, self.win_length, self.window)[0]
-        
+
+        #_sc_loss = self.sc_loss(preds, targets)
+        #_mag_loss = self.mag_loss(preds, targets)
+        #return self.factor_sc * _sc_loss + self.factor_mag * _mag_loss
+    
         mask = torch.zeros_like(preds, dtype=preds.dtype, device=preds.device)
         for b in range(len(preds)):
             length = 1 + (lengths[b]-self.n_fft)//self.hop_length
             mask[b, :, :length] = 1.
-        return self.loss(preds * mask, targets * mask) / torch.sum(mask)
+        _sc_loss = torch.norm(targets[b, :, :length] - preds[b, :, :length], p="fro") / torch.norm(targets[b, :, :length], p="fro")
+        _mag_loss = self.loss(preds * mask, targets * mask) / torch.sum(mask)
 
+        return self.factor_sc * _sc_loss + self.factor_mag * _mag_loss
+        #return self.loss(preds * mask, targets * mask) / torch.sum(mask)
+        
 class MultiResolutionCepstrumLoss(nn.Module):
     def __init__(self):
         super().__init__()

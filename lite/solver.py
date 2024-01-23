@@ -14,6 +14,7 @@ from loss.pesq_loss import PesqLoss
 from loss.sdr_loss import NegativeSISDR
 from loss.stoi_loss import NegSTOILoss
 from loss.plcpa import MultiResPLCPA_ASYM, PLCPA_ASYM
+from loss.cepstrum_loss import MultiResolutionCepstrumLoss 
 from typing import Tuple
 from einops import rearrange
 
@@ -73,6 +74,13 @@ class LitSepSpeaker(pl.LightningModule):
         else:
             self.lfcc_loss_weight = 0.
 
+        # Cepstrum Loss
+        if 'cepstrum_loss' in config['loss'].keys() and config['loss']['cepstrum_loss']['weight'] > 0.0:
+            self.cep_loss = MultiResolutionCepstrumLoss()
+            self.cep_loss_weight = config['loss']['cepstrum_loss']['weight']
+        else:
+            self.cep_loss_weight = 0.
+            
         # PLCPA Loss
         if 'plcpa_asym' in config['loss'].keys() and config['loss']['plcpa']['weight'] > 0.0:
             self.plcpa_loss = PLCPA_ASYM(config['loss']['plcpa_asym'])
@@ -82,6 +90,7 @@ class LitSepSpeaker(pl.LightningModule):
             
         self.stft_loss = self.pesq_loss = self.stoi_loss = self.sdr_loss = None
         self.stft_loss_weight = self.pesq_loss_weight = self.stoi_loss_weight = self.sdr_loss_weight = 0.
+        
         if config['loss']['stft_loss']['use']:
             self.stft_loss = MultiResolutionSTFTLoss()
             self.stft_loss_weight = config['loss']['stft_loss']['weight']
@@ -157,7 +166,16 @@ class LitSepSpeaker(pl.LightningModule):
                 d['valid_lfcc_loss'] = _lfcc_loss
             else:
                 d['train_lfcc_loss'] = _lfcc_loss
-        
+
+        if self.cep_loss_weight > 0.:
+            with torch.cuda.amp.autocast():
+                _cep_loss = self.cep_loss(estimate, target, lengths)
+            _loss  += self.cep_loss_weight * _cep_loss
+            if valid:
+                d['valid_cep_loss'] = _cep_loss
+            else:
+                d['train_cep_loss'] = _cep_loss
+                
         if self.stft_loss:
             with torch.cuda.amp.autocast():
                 _stft_loss1, _stft_loss2 = self.stft_loss(estimate, target)
